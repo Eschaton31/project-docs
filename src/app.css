@@ -1,0 +1,296 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*html {*/
+/*  width: 8.27in;*/
+/*  margin: 0.5in 0.5in 0.75in 0.5in;*/
+/*}*/
+
+@page {
+  size: A4;
+  margin: 0.5in 0.5in 0.75in 0.5in;
+  border: black 1px;
+  @bottom-right {
+    content: counter(page); /* Displays only the current page number */
+    vertical-align: center;
+    text-align: right;
+    font-weight: 900;
+    font-size: 15pt;
+    color: #0b6374;
+  }
+  @bottom-left {
+    content: element(titleRunning);
+    vertical-align: center;
+  }
+}
+
+/* Remove margins and padding from fragmented table parts to stop phantom blocks */
+.pagedjs_page .pagedjs_margin-bottom,
+.pagedjs_page .pagedjs_margin-bottom-left,
+.pagedjs_page .pagedjs_margin-bottom-right {
+  margin-bottom: 0 !important;
+}
+
+.pagedjs_pages {
+  display: flex;
+  width: minmax(var(--pagedjs-width), calc(var(--pagedjs-width) * 2));
+  flex: 0;
+  flex-wrap: wrap;
+  margin: 0 auto;
+  justify-content: center;
+}
+
+codetext {
+  border-radius: 0.25rem;
+  background-color: #ececec;
+  padding: 0.125rem 0.25rem;
+  font-family: 'Iosevka Extended', monospace;
+  font-weight: 900;
+  font-size: 8.5pt;
+  color: #424242;
+}
+
+.highlight-text {
+  border-radius: 0.25rem;
+  background-color: #ececec;
+  padding: 0.125rem 0.25rem;
+}
+
+.text-link {
+  color: #155dfc;
+  text-decoration: underline;
+}
+
+/* margins for last child of topics */
+.primary-topic + *:last-child,
+.secondary-topic + *:last-child,
+.tertiary-topic + *:last-child,
+.quaternary-topic + *:last-child {
+  margin-bottom: 2rem !important;
+}
+
+/* Styles each individual page in the browser view */
+.pagedjs_sheet {
+  /* Add a solid border for visibility */
+  border: 1px solid black !important;
+}
+
+.new-page {
+  break-before: page !important;
+  page-break-inside: auto;
+}
+
+.title {
+  position: running(titleRunning);
+}
+
+#toc-page li a::after {
+  content: target-counter(attr(href), page);
+  float: right;
+}
+
+.toc-page {
+  break-before: page;
+}
+
+/* table of contents */
+.toc-entry {
+  display: flex; /* Aligns items on one line and enables flex properties */
+  align-items: center; /* Vertically centers the text and the dotted line */
+  justify-content: space-between; /* Pushes content to the edges */
+  width: 100%; /* Ensures the container spans the full width */
+}
+
+.toc-entry:first-child::after {
+  content: '';
+  flex: 1 1 auto;
+  border-bottom: 1px dashed #444;
+  margin: 0 8px;
+  transform: translateY(-50%);
+}
+
+.toc-entry:last-child {
+  content: target-counter(attr(id), page);
+}
+
+/* set the style for the list numbering to none */
+#list-toc-generated {
+  list-style: none;
+}
+
+#list-toc-generated .toc-element {
+  break-inside: avoid !important;
+}
+
+#list-toc-generated .toc-element a::after {
+  content: target-counter(attr(href), page);
+  float: right;
+}
+
+#list-toc-generated .toc-element-level-1 {
+  margin-top: 1rem;
+  font-weight: bold;
+}
+
+#list-toc-generated .toc-element-level-2 {
+  margin-top: 0.75rem;
+  margin-left: 1.5rem;
+}
+
+#list-toc-generated .toc-element-level-3 {
+  margin-top: 0.5rem;
+  margin-left: 3rem;
+}
+
+#list-toc-generated .toc-element-level-4 {
+  margin-top: 0.25rem;
+  margin-left: 4.5rem;
+}
+
+#list-toc-generated {
+  position: absolute;
+  width: 100%;
+  margin-top: 2.5rem;
+  overflow: hidden;
+}
+
+/* fake leading */
+#list-toc-generated .toc-element::after {
+  content: '';
+  flex: 1 1 auto;
+  border-bottom: 1px dashed #424242;
+  margin: 0 1.5rem 0 0.5rem;
+  transform: translateY(-7px);
+}
+
+#list-toc-generated .toc-element {
+  display: flex;
+}
+
+#list-toc-generated .toc-element a::after {
+  position: absolute;
+  right: 0;
+  background-color: white;
+  padding-left: 6px;
+}
+
+#list-toc-generated .toc-element a {
+  right: 0;
+}
+
+/* file and directory tree */
+:root {
+  --tree-dash-height: .75rem;
+  --tree-dash-tab: 2;
+  --tree-padding: .1rem;
+}
+
+.tree {
+  position: relative;
+  font-family: 'Iosevka Extended', monospace;
+  font-size: 8.5pt;
+  font-weight: 400;
+  line-height: 12pt;
+  color: #212529;
+}
+
+.tree span {
+  font-size: 8.5pt;
+  font-style: italic;
+  color: #a8a8a8;
+}
+
+.tree ul {
+  padding-left: .4rem;
+  list-style: none;
+}
+
+.tree > li {
+  list-style-type: none;
+}
+
+.tree ul li {
+  position: relative;
+  padding-top: var(--tree-padding);
+  padding-bottom: var(--tree-padding);
+  padding-left: 1rem;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.tree ul div {
+  padding-top: var(--tree-padding);
+  padding-bottom: var(--tree-padding);
+}
+
+.tree ul li:before {
+  position: absolute;
+  top: var(--tree-dash-height);
+  left: 0;
+  width: 10px;
+  height: 1px;
+  margin: auto;
+  content: '';
+  background-color: #3d3d3d;
+}
+
+.tree ul li:after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  content: '';
+  background-color: #3d3d3d;
+}
+
+.tree ul li:last-child:after {
+  height: var(--tree-dash-height);
+}
+
+.tree ul a {
+  cursor: pointer;
+}
+
+.tree ul a:hover {
+  text-decoration: none;
+}
+
+/* code blocks */
+code[class*='language-'],
+pre[class*='language-'] {
+  font-family: 'Iosevka', monospace !important;
+}
+
+/* Enable font ligatures */
+pre code {
+  font-variant-ligatures: normal;
+}
+
+.prism-fileblock {
+  margin: 1.2em 0;
+  border-radius: 6px;
+  overflow: hidden; /* ensures header + code share same radius */
+  background: #2d2d2d; /* match your Prism theme */
+}
+
+/* Header that looks like part of the block */
+.prism-fileblock-header {
+  padding: 8px 12px;
+  font-family: 'Iosevka', monospace !important;
+  font-size: 8.5pt;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.25); /* subtle contrast */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* divider */
+}
+
+/* Remove pre’s own radius so it blends */
+.prism-fileblock pre {
+  margin: 0;
+  border-radius: 0;
+  background: transparent !important; /* use wrapper background */
+  padding-top: 12px; /* spacing after divider */
+}

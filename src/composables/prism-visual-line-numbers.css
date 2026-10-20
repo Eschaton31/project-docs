@@ -1,0 +1,39 @@
+/* Enable soft-wrap globally or selectively as desired */
+pre[class*="language-"],
+code[class*="language-"] {
+  white-space: pre-wrap;
+  word-break: break-word; /* optional but useful for long tokens */
+}
+
+/* Core visual line numbers styles */
+pre.visual-line-numbers {
+  position: relative; /* reinforced in JS as a safety */
+  padding-left: 3.5em; /* adjust width to your liking */
+}
+
+/* Gutter container */
+pre.visual-line-numbers > .visual-line-numbers-rows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3em; /* should roughly match padding-left - 0.5em */
+  pointer-events: none;
+  user-select: none;
+  counter-reset: linenumber;
+}
+
+/* One span per visual line */
+pre.visual-line-numbers > .visual-line-numbers-rows > span {
+  display: block;
+  counter-increment: linenumber;
+}
+
+/* Actual numbers */
+pre.visual-line-numbers > .visual-line-numbers-rows > span::before {
+  content: counter(linenumber);
+  display: block;
+  text-align: right;
+  padding-right: 0.5em;
+  opacity: 0.6;
+  font-size: 0.9em; /* tweak if you want tighter gutter */
+}
