@@ -3,7 +3,7 @@ import colors from 'tailwindcss/colors'
 import defaultTheme from 'tailwindcss/defaultTheme'
 
 export default {
-  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
+  content: ['./resources/views/**/*.blade.php', './resources/js/**/*.{vue,js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
@@ -16,6 +16,8 @@ export default {
         teal: '#0b6374',
         gray: '#424242',
       },
+      transparent: 'transparent',
+      current: 'currentColor',
       black: colors.black,
       white: colors.white,
       gray: colors.gray,

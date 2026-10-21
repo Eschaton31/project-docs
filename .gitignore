@@ -1,5 +1,4 @@
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -9,10 +8,26 @@ lerna-debug.log*
 
 node_modules
 .DS_Store
+Thumbs.db
 dist
 dist-ssr
 coverage
 *.local
+
+# Laravel
+/vendor
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+/.phpunit.cache
+_ide_helper.php
+/auth.json
 
 # Editor directories and files
 .vscode/*
@@ -34,3 +49,6 @@ coverage
 
 # Vitest
 __screenshots__/
+
+# uploaded document images
+/public/img/uploads

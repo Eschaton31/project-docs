@@ -2,12 +2,13 @@
   "compilerOptions": {
     "paths": {
       "@/*": [
-        "./src/*"
+        "./resources/js/*"
       ]
     }
   },
   "exclude": [
     "node_modules",
-    "dist"
+    "vendor",
+    "public/build"
   ]
 }

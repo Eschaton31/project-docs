@@ -13,7 +13,7 @@ import 'prismjs/plugins/line-numbers/prism-line-numbers.js'
 import { createApp } from 'vue'
 
 import App from './App.vue'
-import './app.css'
+import '../css/app.css'
 import router from './router'
 
 Prism.languages.r = {
@@ -206,6 +206,9 @@ const createToc = (config) => {
   const titleElements = config.titleElements
 
   let tocElementDiv = content.querySelector(tocElement)
+  // stored documents can switch the table of contents off
+  if (!tocElementDiv) return
+
   let tocUl = document.createElement('ul')
   tocUl.id = 'list-toc-generated'
   tocUl.classList.add('gap-2')
