@@ -49,7 +49,7 @@ const slots = useSlots()
         <XCircleIcon v-else-if="type === 'error'" aria-hidden="true" class="text-red-400 size-4" />
         <InfoIcon v-else aria-hidden="true" class="size-4 text-white" fill="#4786eb" />
       </div>
-      <div :class="[textColor, 'flex-1 space-y-1 md:flex md:justify-between']">
+      <div :class="[textColor, 'flex-1 space-y-1']">
         <span class="alert-title font-bold"
           ><slot name="title"><span v-html="title" /></slot
         ></span>
