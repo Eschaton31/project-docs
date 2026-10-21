@@ -7,7 +7,6 @@ use App\Pdf\BrowsershotRenderer;
 use App\Pdf\PdfRenderer;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -27,11 +26,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::define('admin', fn (User $user) => $user->isAdmin());
-
-        // behind the HTTPS proxy chain the request itself can look like plain http; APP_URL is the truth
-        if (str_starts_with(config('app.url'), 'https://')) {
-            URL::forceScheme('https');
-        }
 
         if ($this->app->runningConsoleCommand('dev')) {
             $this->serveOnHostIp();
