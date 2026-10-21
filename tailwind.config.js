@@ -4,6 +4,9 @@ import defaultTheme from 'tailwindcss/defaultTheme'
 
 export default {
   content: ['./resources/views/**/*.blade.php', './resources/js/**/*.{vue,js,ts,jsx,tsx}'],
+  // classes inside stored document HTML (RichText, table cells), which no source file contains;
+  // add to this when documents start using new ones
+  safelist: ['h-48', 'mx-auto', 'my-4', 'text-center', 'w-auto', 'w-full'],
   theme: {
     extend: {
       fontFamily: {

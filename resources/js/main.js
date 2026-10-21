@@ -12,8 +12,8 @@ import 'prismjs/plugins/line-numbers/prism-line-numbers.js'
 
 import { createApp } from 'vue'
 
-import App from './App.vue'
 import '../css/app.css'
+import App from './App.vue'
 import router from './router'
 
 Prism.languages.r = {
@@ -176,30 +176,6 @@ Prism.languages.insertBefore('clickhouse', 'keyword', {
   },
 })
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('pre[filename]').forEach((pre) => {
-    const filename = pre.getAttribute('filename')
-
-    // Create wrapper
-    const wrapper = document.createElement('div')
-    wrapper.className = 'prism-fileblock'
-
-    // Create header
-    const header = document.createElement('div')
-    header.className = 'prism-fileblock-header'
-    header.textContent = filename
-
-    // Wrap
-    pre.parentNode.insertBefore(wrapper, pre)
-    wrapper.appendChild(header)
-    wrapper.appendChild(pre)
-  })
-})
-
-window.addEventListener('load', function () {
-  Prism.highlightAll()
-  Prism.plugins.lineNumbers.resize()
-})
 const createToc = (config) => {
   const content = config.content
   const tocElement = config.tocElement
@@ -279,20 +255,6 @@ registerHandlers(
     }
   }
 )
-
-if (import.meta.hot) {
-  import.meta.hot.on('vite:beforeUpdate', () => {
-    console.log('HMR update is about to be applied')
-  })
-
-  import.meta.hot.on('vite:afterUpdate', () => {
-    window.dispatchEvent(new Event('hmr-reload'))
-  })
-
-  import.meta.hot.on('vite:beforeFullReload', () => {
-    console.log('A full page reload is about to happen')
-  })
-}
 
 const app = createApp(App)
 

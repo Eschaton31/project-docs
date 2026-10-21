@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  {{-- no <title> here: the hand-built pages put one in the body for the print file name, and the first
-       <title> in the document wins. Builder pages set document.title themselves. --}}
+  <title>{{ config('app.name') }}</title>
   <link href="/favicon.ico" rel="icon">
   <link href="https://rsms.me/" rel="preconnect">
   <link href="https://rsms.me/inter/inter.css" rel="stylesheet" />

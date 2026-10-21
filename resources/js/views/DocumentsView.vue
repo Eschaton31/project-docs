@@ -13,6 +13,7 @@ const documents = ref(null)
 const title = ref('')
 const error = ref(null)
 const creating = ref(false)
+const importing = ref(false)
 
 onMounted(async () => {
   try {
@@ -35,6 +36,24 @@ async function create() {
   }
 }
 
+/** A document exported as JSON (Export JSON, or a published version's JSON) becomes a new document. */
+async function importFile(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+
+  importing.value = true
+  error.value = null
+  try {
+    const document = await api.importDocument(JSON.parse(await file.text()))
+    await router.push(`/edit/${document.slug}`)
+  } catch (e) {
+    error.value = e instanceof SyntaxError ? `${file.name} is not valid JSON.` : errorMessage(e)
+  } finally {
+    importing.value = false
+  }
+}
+
 async function logout() {
   await auth.logout()
   await router.push('/login')
@@ -46,7 +65,10 @@ async function logout() {
     <header class="flex items-center justify-between">
       <h1 class="text-xl font-bold text-bene-teal">Documents</h1>
       <div class="flex items-center gap-4 text-slate-600">
-        <RouterLink class="underline" to="/import">Import hand-built pages</RouterLink>
+        <label :class="['cursor-pointer underline', importing ? 'pointer-events-none opacity-50' : '']">
+          {{ importing ? 'Importing…' : 'Import JSON…' }}
+          <input accept="application/json,.json" class="hidden" type="file" @change="importFile" />
+        </label>
         <span>{{ auth.user?.name }}</span>
         <button class="underline" type="button" @click="logout">Sign out</button>
       </div>
@@ -64,7 +86,7 @@ async function logout() {
 
     <p v-if="error" class="text-rose-700">{{ error }}</p>
     <p v-if="documents && !documents.length" class="text-slate-500">
-      No documents yet. Create one above or import the hand-built pages.
+      No documents yet. Create one above or import a document's JSON.
     </p>
 
     <table v-if="documents?.length" class="w-full text-left">

@@ -1,28 +1,5 @@
 import { Handler } from 'pagedjs'
 
-export function splitByPropertyMarkers(arr, propertyName, markerValues) {
-  const result = []
-  let currentGroup = []
-  const markersSet = new Set(markerValues)
-
-  for (const obj of arr) {
-    currentGroup.push(obj)
-
-    // Check if the current object's property value is a marker
-    if (markersSet.has(obj[propertyName])) {
-      result.push(currentGroup)
-      currentGroup = [] // Start a new group
-    }
-  }
-
-  // Push any remaining elements after the last marker
-  if (currentGroup.length > 0) {
-    result.push(currentGroup)
-  }
-
-  return result
-}
-
 export class RepeatTableHeaderHandler extends Handler {
   constructor(chunker, polisher, caller) {
     super(chunker, polisher, caller)

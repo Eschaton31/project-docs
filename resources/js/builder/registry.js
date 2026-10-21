@@ -115,9 +115,6 @@ export const registry = {
   TechStack: { component: TechStack, label: 'Tech Stack', category: 'Tables', props: ['data'] },
 }
 
-/** Component definition → block type, used by the importer to recognise components in rendered pages. */
-export const typeOfComponent = new Map(Object.entries(registry).map(([type, { component }]) => [component, type]))
-
 /** Types allowed directly under parentType (null = document root), expanding @groups. */
 export function allowedChildren(parentType) {
   const entries = parentType === null ? blockTypes.root : (blockTypes.types[parentType]?.children ?? [])
