@@ -65,7 +65,7 @@ export const registry = {
     topic: true,
   },
 
-  Paragraph: { component: Paragraph, label: 'Paragraph', category: 'Text', props: [], slot: 'blocks' },
+  Paragraph: { component: Paragraph, label: 'Paragraph', category: 'Text', props: ['indent'], slot: 'blocks' },
   RichText: { component: RichText, label: 'Text', category: 'Text', props: ['html'] },
   TertiaryTitle: {
     component: TertiaryTitle,

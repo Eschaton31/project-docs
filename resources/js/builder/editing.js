@@ -59,7 +59,10 @@ export const blockEditing = {
   TertiaryTopic: { fields: [title], template: { props: { title: 'New subsection' } } },
   QuaternaryTopic: { fields: [title], template: { props: { title: 'New item' } } },
 
-  Paragraph: { fields: [], template: { children: [{ type: 'RichText', props: { html: 'New paragraph.' } }] } },
+  Paragraph: {
+    fields: [bool('indent', 'Indent the first line (tab)')],
+    template: { children: [{ type: 'RichText', props: { html: 'New paragraph.' } }] },
+  },
   RichText: {
     fields: [{ name: 'html', label: 'Text', type: 'richtext' }],
     template: { props: { html: 'New text.' } },
