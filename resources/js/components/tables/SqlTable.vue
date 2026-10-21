@@ -5,6 +5,8 @@ const { data } = defineProps({
   data: Array,
   description: String,
   dark: Boolean,
+  // CSS width per column (stored documents); hand-built pages pass <colgroup> elements in the slot instead
+  columnWidths: Array,
 })
 
 const headers = computed(() => Object.keys(data[0]))
@@ -17,7 +19,9 @@ const headers = computed(() => Object.keys(data[0]))
         'w-full table-fixed border-separate border-spacing-0 rounded-md border-b border-t border-solid font-mono text-[8pt]',
         dark ? 'border-[#1e1f22] text-gray-200' : 'border-[#f5f8fe] text-[#080808]',
       ]">
-      <slot />
+      <slot>
+        <colgroup v-for="(width, index) in columnWidths" :key="index" :style="{ width }" />
+      </slot>
       <thead>
         <tr :class="['group', dark ? 'bg-[#2e2f32]' : 'bg-[#efefef]']">
           <th
@@ -43,10 +47,12 @@ const headers = computed(() => Object.keys(data[0]))
               'border-l border-r px-2 py-1.5 group-last:first:rounded-bl-md group-last:last:rounded-br-md',
               dark ? 'border-[#313438]' : 'border-[#ebecf0]',
             ]">
-            <span v-if="cell == null" :class="[dark ? 'text-[#6c7d77]' : 'text-[#8c8c8c]']">
-              <i>&lt;null&gt;</i>
-            </span>
-            <span v-else>{{ cell }}</span>
+            <slot name="cell" :row="index" :column="col" :value="cell">
+              <span v-if="cell == null" :class="[dark ? 'text-[#6c7d77]' : 'text-[#8c8c8c]']">
+                <i>&lt;null&gt;</i>
+              </span>
+              <span v-else>{{ cell }}</span>
+            </slot>
           </td>
         </tr>
       </tbody>

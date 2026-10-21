@@ -9,7 +9,7 @@ defineProps({
 <template>
   <div class="space-y-1">
     <div :id class="quaternary-topic text-[10pt] font-bold text-bene-gray">
-      {{ title }}
+      <slot name="title">{{ title }}</slot>
     </div>
     <div class="space-y-3 text-bene-gray">
       <slot />

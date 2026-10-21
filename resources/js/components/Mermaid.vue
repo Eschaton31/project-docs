@@ -1,11 +1,13 @@
 <script setup>
 import mermaid from 'mermaid'
 
-import { nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { inject, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 
 const props = defineProps({
   code: { type: String, required: true },
 })
+
+const track = inject('renderTracker', null)
 
 const chart = useTemplateRef('chart')
 const renderKey = ref(0)
@@ -35,13 +37,16 @@ watch(
 function render() {
   renderKey.value++ // 🔥 force DOM reset
 
-  nextTick(() => {
+  const done = nextTick().then(() => {
     if (!chart.value) return
 
-    mermaid.render(`m-${Date.now()}`, props.code).then(({ svg }) => {
+    return mermaid.render(`m-${Date.now()}`, props.code).then(({ svg }) => {
       chart.value.innerHTML = svg
     })
   })
+
+  // lets the print view wait for the diagram before paginating
+  track?.(done)
 }
 </script>
 

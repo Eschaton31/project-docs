@@ -20,6 +20,8 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 defineProps({
   list: Array,
   description: String,
+  // position of this (sub-)tree within the top-level list, for editing entries in place
+  path: { type: Array, default: () => [] },
 })
 
 const components = {
@@ -67,11 +69,16 @@ const outline = (type) => {
             <FontAwesomeIcon
               :class="['inline-block size-4', outline(type)]"
               :icon="components[type === 'folder' && children?.length > 0 ? 'folderOpen' : (type ?? 'file')]" />
-            {{ name }}
-            <span v-if="note">{{ note }}</span>
+            <slot name="name" :path="[...path, index]" :value="name">{{ name }}</slot>
+            <span v-if="note"
+              ><slot name="note" :path="[...path, index]" :value="note">{{ note }}</slot></span
+            >
           </div>
           <template v-if="children?.length > 0">
-            <FileTree :list="children" />
+            <FileTree :list="children" :path="[...path, index]">
+              <template v-if="$slots.name" #name="scope"><slot name="name" v-bind="scope" /></template>
+              <template v-if="$slots.note" #note="scope"><slot name="note" v-bind="scope" /></template>
+            </FileTree>
           </template>
         </li>
       </ul>

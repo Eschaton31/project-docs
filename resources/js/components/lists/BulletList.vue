@@ -3,6 +3,8 @@ import { isArray } from 'lodash'
 
 defineProps({
   list: Array,
+  // position of this (sub-)list within the top-level list, for editing items in place
+  path: { type: Array, default: () => [] },
 })
 </script>
 
@@ -11,9 +13,11 @@ defineProps({
     <template v-for="(item, key) in list" :key="key">
       <li class="pl-2 text-bene-gray">
         <template v-if="isArray(item)">
-          <BulletList :list="item" />
+          <BulletList :list="item" :path="[...path, key]">
+            <template v-if="$slots.item" #item="scope"><slot name="item" v-bind="scope" /></template>
+          </BulletList>
         </template>
-        <span v-else v-html="item"></span>
+        <slot v-else name="item" :path="[...path, key]" :value="item"><span v-html="item"></span></slot>
       </li>
     </template>
   </ul>

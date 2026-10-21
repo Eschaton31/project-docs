@@ -19,14 +19,24 @@ defineProps({
       </thead>
       <tbody>
         <tr v-for="({ field, description, type, values }, index) in data" :key="index" class="even:bg-gray-100">
-          <td class="w-1/5 px-2 py-1 text-center font-mono font-bold" v-html="field" />
-          <td class="border-l border-r border-solid border-[#b7b7b7] px-2 py-1" v-html="description" />
-          <td class="border-l border-r border-solid border-[#b7b7b7] px-2 py-1" v-html="type" />
+          <td class="w-1/5 px-2 py-1 text-center font-mono font-bold">
+            <slot name="cell" :row="index" column="field" :value="field"><span v-html="field" /></slot>
+          </td>
+          <td class="border-l border-r border-solid border-[#b7b7b7] px-2 py-1">
+            <slot name="cell" :row="index" column="description" :value="description"
+              ><span v-html="description"
+            /></slot>
+          </td>
+          <td class="border-l border-r border-solid border-[#b7b7b7] px-2 py-1">
+            <slot name="cell" :row="index" column="type" :value="type"><span v-html="type" /></slot>
+          </td>
           <td class="px-2 py-1">
-            <template v-if="isArray(values)">
-              <div v-for="(value, index) in values" :key="index" v-html="value" />
-            </template>
-            <span v-else v-html="values" />
+            <slot name="cell" :row="index" column="values" :value="values">
+              <template v-if="isArray(values)">
+                <div v-for="(value, idx) in values" :key="idx" v-html="value" />
+              </template>
+              <span v-else v-html="values" />
+            </slot>
           </td>
         </tr>
       </tbody>

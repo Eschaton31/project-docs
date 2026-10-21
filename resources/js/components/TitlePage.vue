@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   title: String,
   subtitle: String,
@@ -9,14 +11,15 @@ const props = defineProps({
   submittedBy: String,
   submittedTo: String,
 })
-const table = [
+// computed so the editor's title-page settings update live
+const table = computed(() => [
   { id: 'Client', value: props.client },
   { id: 'Project', value: props.project },
   { id: 'Date Submitted', value: props.dateSubmitted },
   { id: 'Version', value: props.version },
   { id: 'Submitted by', value: props.submittedBy },
   { id: 'Submitted to', value: props.submittedTo },
-]
+])
 </script>
 
 <template>
