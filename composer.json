@@ -47,6 +47,12 @@
             "Composer\\Config::disableProcessTimeout",
             "@php artisan dev"
         ],
+        "prod": [
+            "Composer\\Config::disableProcessTimeout",
+            "npm run build",
+            "@php -r \"@unlink('public/hot');\"",
+            "npx concurrently -c \"#c4b5fd,#fdba74\" \"php artisan queue:work\" \"php artisan reverb:start\" --names=queue,reverb --kill-others"
+        ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
