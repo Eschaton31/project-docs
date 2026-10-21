@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* editor form controls */
+@layer components {
+  .field-input {
+    @apply w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800 focus:border-bene-teal focus:outline-none;
+  }
+
+  .toolbar-button {
+    @apply rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40;
+  }
+
+  /* rich text toolbar */
+  .rt-button {
+    @apply min-w-7 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40;
+  }
+
+  .rt-active {
+    @apply border-bene-teal bg-teal-50 text-bene-teal;
+  }
+}
+
+/* table cells and list items being edited in place */
+.inline-cell:hover {
+  outline: 1px dashed #94a3b8;
+}
+
+.inline-cell:focus {
+  outline: 2px solid rgb(11 99 116 / 0.5);
+  background-color: #f0fdfa;
+}
+
+/* TipTap's editable area inside .field-input */
+.ProseMirror {
+  white-space: pre-wrap;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
 /*html {*/
 /*  width: 8.27in;*/
 /*  margin: 0.5in 0.5in 0.75in 0.5in;*/
