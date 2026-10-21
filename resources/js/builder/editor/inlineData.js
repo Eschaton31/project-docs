@@ -40,6 +40,21 @@ export function writeAt(value, kind, { path, field }, next) {
 }
 
 /**
+ * Writes a table cell that is shown merged across the rows below it with the same value (TestScenarios'
+ * functionality): those rows change too, so the group stays together.
+ */
+export function writeMergedAt(value, { path, field }, next) {
+  const copy = clone(value)
+  const [row] = path
+  const previous = copy[row]?.[field]
+  for (let index = row; index < copy.length && copy[index][field] === previous; index++) {
+    copy[index] = { ...copy[index], [field]: next }
+  }
+
+  return copy
+}
+
+/**
  * Inserts an empty item (or table row) after the addressed one.
  * @returns {{ value, address }} address of the new item, to move the caret there
  */

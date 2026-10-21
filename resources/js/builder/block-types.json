@@ -18,7 +18,8 @@
       "ConversionDictionary",
       "DataDictionary",
       "SqlTable",
-      "TechStack"
+      "TechStack",
+      "TestScenarios"
     ],
     "inline": [
       "RichText",
@@ -58,6 +59,7 @@
     "ConversionDictionary": { "children": [] },
     "DataDictionary": { "children": [] },
     "SqlTable": { "children": [] },
-    "TechStack": { "children": [] }
+    "TechStack": { "children": [] },
+    "TestScenarios": { "children": [] }
   }
 }

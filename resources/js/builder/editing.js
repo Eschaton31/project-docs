@@ -219,6 +219,26 @@ export const blockEditing = {
     ],
     template: { props: { data: [{ component: 'Component', tech: 'Technology', framework: 'Framework' }] } },
   },
+  TestScenarios: {
+    fields: [
+      {
+        ...grid('data', 'Rows', [
+          column('functionality', 'Functionality'),
+          column('details', 'Details', 'lines'),
+          column('remarks', 'Remarks', 'lines'),
+        ]),
+        hint: 'Rows with the same Functionality as the row above are merged into one group.',
+      },
+    ],
+    template: {
+      props: {
+        data: [
+          { functionality: 'Functionality', details: 'Detail', remarks: '' },
+          { functionality: 'Functionality', details: 'Another detail', remarks: '' },
+        ],
+      },
+    },
+  },
 }
 
 export const OPTION_FIELDS = [

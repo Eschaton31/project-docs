@@ -14,7 +14,8 @@ import { fitsRichText } from './richText.js'
  * hit: the part of the block that has to be clicked (a topic's heading, not its body).
  *
  * For cells: lines = columns that take several lines; plain / plainFields = text the component renders
- * as text rather than HTML; nullable = an emptied cell is NULL; columns = for a first row in an empty table.
+ * as text rather than HTML; nullable = an emptied cell is NULL; columns = for a first row in an empty table;
+ * merged = columns shown as one cell across equal rows, so editing it changes the whole group.
  */
 const TITLE = { kind: 'text', prop: 'title', slot: 'title' }
 const LIST = { kind: 'cells', prop: 'list', shape: 'list' }
@@ -42,6 +43,12 @@ export const INLINE_EDITABLE = {
   ConversionDictionary: { ...TABLE, lines: ['description', 'formats'], columns: ['item', 'description', 'formats'] },
   DataDictionary: { ...TABLE, lines: ['values'], columns: ['field', 'description', 'type', 'values'] },
   TechStack: { ...TABLE, lines: ['tech', 'framework'], columns: ['component', 'tech', 'framework'] },
+  TestScenarios: {
+    ...TABLE,
+    lines: ['details', 'remarks'],
+    merged: ['functionality'],
+    columns: ['functionality', 'details', 'remarks'],
+  },
   SqlTable: { ...TABLE, plain: true, nullable: true },
 }
 

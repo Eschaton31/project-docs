@@ -15,6 +15,7 @@ import {
   setSublistBoldAt,
   sublistBoldAt,
   writeAt,
+  writeMergedAt,
 } from './inlineData.js'
 
 /**
@@ -72,7 +73,12 @@ function cell(address, cellValue) {
       active.value = address
       if (focusKey.value === addressKey(address)) focusKey.value = null
     },
-    onUpdate: (next) => save(writeAt(value.value, shape.value, address, next)),
+    onUpdate: (next) =>
+      save(
+        isTable.value && (rule.merged ?? []).includes(field)
+          ? writeMergedAt(value.value, address, next)
+          : writeAt(value.value, shape.value, address, next)
+      ),
     onEnter: () => enter(address),
     onRemoveEmpty: () => removeEmpty(address),
     onIndent: () => nest(indentAt, address),

@@ -65,6 +65,22 @@ describe('editing tables in place', () => {
     expect(saves.at(-1)[0].framework).toBe('Laravel 13')
   })
 
+  it('renames every row of a merged group from its one cell', async () => {
+    const { cells, saves } = await edit('TestScenarios', {
+      data: [
+        { functionality: 'SMS', details: 'Sent', remarks: '' },
+        { functionality: 'SMS', details: 'Delivered', remarks: '' },
+        { functionality: 'Email', details: 'Sent', remarks: '' },
+      ],
+    })
+
+    // the merged cell, then details/remarks for two rows, then Email's three cells
+    expect(cells()).toHaveLength(8)
+
+    await type(cells()[0], 'Notifications')
+    expect(saves.at(-1).map((row) => row.functionality)).toEqual(['Notifications', 'Notifications', 'Email'])
+  })
+
   it('moves down a row on Enter, and adds and removes rows from the toolbar', async () => {
     const { wrapper, cells, saves } = await edit('KeyValueTable', {
       table: [
@@ -215,6 +231,7 @@ it('lets every table and list start editing in place', () => {
     'ConversionDictionary',
     'DataDictionary',
     'TechStack',
+    'TestScenarios',
     'SqlTable',
   ]) {
     expect(inlineEditCheck({ type, props: {} }, anywhere).ok, type).toBe(true)

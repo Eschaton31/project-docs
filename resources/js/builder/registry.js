@@ -4,6 +4,7 @@ import ItemDescriptionTable from '@/components/tables/ItemDescriptionTable.vue'
 import KeyValueTable from '@/components/tables/KeyValueTable.vue'
 import SqlTable from '@/components/tables/SqlTable.vue'
 import TechStack from '@/components/tables/TechStack.vue'
+import TestScenarios from '@/components/tables/TestScenarios.vue'
 
 import Alert from '@/components/Alert.vue'
 import CodeBlock from '@/components/CodeBlock.vue'
@@ -113,6 +114,7 @@ export const registry = {
     props: ['data', 'description', 'dark', 'columnWidths'],
   },
   TechStack: { component: TechStack, label: 'Tech Stack', category: 'Tables', props: ['data'] },
+  TestScenarios: { component: TestScenarios, label: 'Test Scenarios', category: 'Tables', props: ['data'] },
 }
 
 /** Types allowed directly under parentType (null = document root), expanding @groups. */
