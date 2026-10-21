@@ -1,0 +1,63 @@
+{
+  "groups": {
+    "content": [
+      "Paragraph",
+      "RichText",
+      "Alert",
+      "Image",
+      "CodeBlock",
+      "Mermaid",
+      "Placeholder",
+      "BulletList",
+      "NumberedList",
+      "ConceptList",
+      "FileTree",
+      "Breadcrumbs",
+      "ItemDescriptionTable",
+      "KeyValueTable",
+      "ConversionDictionary",
+      "DataDictionary",
+      "SqlTable",
+      "TechStack"
+    ],
+    "inline": [
+      "RichText",
+      "TertiaryTitle",
+      "BulletList",
+      "NumberedList",
+      "ConceptList",
+      "Breadcrumbs",
+      "FileTree",
+      "Image",
+      "CodeBlock",
+      "ItemDescriptionTable",
+      "KeyValueTable"
+    ]
+  },
+  "root": ["PrimaryTopic"],
+  "types": {
+    "PrimaryTopic": { "children": ["SecondaryTopic", "@content"] },
+    "SecondaryTopic": { "children": ["TertiaryTopic", "@content"] },
+    "TertiaryTopic": { "children": ["QuaternaryTopic", "@content"] },
+    "QuaternaryTopic": { "children": ["@content"] },
+    "Paragraph": { "children": ["@inline"] },
+    "Alert": { "children": ["RichText"] },
+    "RichText": { "children": [] },
+    "TertiaryTitle": { "children": [] },
+    "Placeholder": { "children": [] },
+    "Image": { "children": [] },
+    "CodeBlock": { "children": [] },
+    "Mermaid": { "children": [] },
+    "BulletList": { "children": [] },
+    "NumberedList": { "children": [] },
+    "ConceptList": { "children": [] },
+    "FileTree": { "children": [] },
+    "Breadcrumbs": { "children": [] },
+    "ItemDescriptionTable": { "children": [] },
+    "KeyValueTable": { "children": [] },
+    "ConversionDictionary": { "children": [] },
+    "DataDictionary": { "children": [] },
+    "SqlTable": { "children": [] },
+    "TechStack": { "children": [] }
+  }
+}
