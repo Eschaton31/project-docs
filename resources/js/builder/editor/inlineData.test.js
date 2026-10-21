@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { addressKey, append, insertAfter, readAt, removeAt, writeAt } from './inlineData.js'
+import {
+  addressKey,
+  append,
+  indentAt,
+  insertAfter,
+  outdentAt,
+  readAt,
+  removeAt,
+  setSublistBoldAt,
+  sublistBoldAt,
+  writeAt,
+} from './inlineData.js'
 
 describe('nested bullet lists', () => {
   const list = ['To provide a framework', ['first detail', 'second detail'], 'Link to resources']
@@ -30,6 +41,73 @@ describe('nested bullet lists', () => {
       value: ['To provide a framework', ['first detail', 'second detail']],
       address: { path: [0], field: null },
     })
+  })
+})
+
+describe('indenting and outdenting list items', () => {
+  const at = (...path) => ({ path, field: null })
+
+  it('nests an item under the one before, starting a sub-list or joining its existing one', () => {
+    expect(indentAt(['a', 'b', 'c'], at(1))).toEqual({ value: ['a', ['b'], 'c'], address: at(1, 0) })
+    expect(indentAt(['a', ['a1'], 'b'], at(2))).toEqual({ value: ['a', ['a1', 'b']], address: at(1, 1) })
+  })
+
+  it('takes the item’s own sub-list along', () => {
+    expect(indentAt(['a', 'b', ['b1'], 'c'], at(1))).toEqual({ value: ['a', ['b', ['b1']], 'c'], address: at(1, 0) })
+    expect(indentAt(['a', ['a1'], 'b', ['b1']], at(2))).toEqual({
+      value: ['a', ['a1', 'b', ['b1']]],
+      address: at(1, 1),
+    })
+  })
+
+  it('can’t indent the first item of a list', () => {
+    expect(indentAt(['a', 'b'], at(0))).toBeNull()
+    expect(indentAt(['a', ['a1']], at(1, 0))).toBeNull()
+  })
+
+  it('moves a sub-item up a level after the item it belonged to', () => {
+    expect(outdentAt(['a', ['a1'], 'b'], at(1, 0))).toEqual({ value: ['a', 'a1', 'b'], address: at(1) })
+    expect(outdentAt(['a', ['a1', 'a2'], 'b'], at(1, 1))).toEqual({ value: ['a', ['a1'], 'a2', 'b'], address: at(2) })
+  })
+
+  it('keeps its sub-items, and the items after it become sub-items too', () => {
+    expect(outdentAt(['a', ['a1', ['x'], 'a2']], at(1, 0))).toEqual({ value: ['a', 'a1', ['x', 'a2']], address: at(1) })
+    expect(outdentAt(['a', ['a1', ['a1a', 'a1b']]], at(1, 1, 0))).toEqual({
+      value: ['a', ['a1', 'a1a', ['a1b']]],
+      address: at(1, 1),
+    })
+  })
+
+  it('can’t outdent a top-level item', () => {
+    expect(outdentAt(['a', 'b'], at(1))).toBeNull()
+  })
+
+  it('keeps a sub-list bold through indenting and outdenting', () => {
+    const bold = (list) => ({ bold: true, list })
+
+    expect(indentAt(['a', bold(['a1']), 'b'], at(2)).value).toEqual(['a', bold(['a1', 'b'])])
+    expect(outdentAt(['a', bold(['a1', 'a2'])], at(1, 0)).value).toEqual(['a', 'a1', bold(['a2'])])
+    expect(outdentAt(['a', ['a1', bold(['x'])]], at(1, 0)).value).toEqual(['a', 'a1', bold(['x'])])
+    expect(readAt(['a', bold(['a1', ['deep']])], 'list', at(1, 1, 0))).toBe('deep')
+    expect(removeAt(['a', bold(['a1']), 'b'], 'list', at(0)).value).toEqual(['b'])
+  })
+
+  it('round-trips', () => {
+    const list = ['a', 'b', ['b1'], 'c']
+    const indented = indentAt(list, at(1))
+    expect(outdentAt(indented.value, indented.address).value).toEqual(list)
+  })
+})
+
+describe('bold sub-lists', () => {
+  it('reads and sets bold for the sub-list holding an item', () => {
+    const list = ['a', ['a1', ['deep']]]
+    const next = setSublistBoldAt(list, { path: [1, 1, 0], field: null }, true)
+
+    expect(next).toEqual(['a', ['a1', { bold: true, list: ['deep'] }]])
+    expect(sublistBoldAt(next, { path: [1, 1, 0], field: null })).toBe(true)
+    expect(sublistBoldAt(next, { path: [1, 0], field: null })).toBe(false)
+    expect(setSublistBoldAt(next, { path: [1, 1, 0], field: null }, false)).toEqual(list)
   })
 })
 

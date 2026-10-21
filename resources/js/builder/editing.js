@@ -1,3 +1,5 @@
+import { isSublist, makeSublist, sublistBold, sublistItems } from '@/components/lists/listEntries.js'
+
 import { registry } from './registry.js'
 
 /**
@@ -102,8 +104,9 @@ export const blockEditing = {
         name: 'list',
         label: 'Items',
         type: 'list',
-        hint: 'One item per line; indent two spaces for a sub-list. HTML allowed.',
+        hint: 'One item per line; indent two spaces for a sub-list, and start its first line with ** to make it bold. HTML allowed.',
       },
+      bool('bold', 'Bold (top-level items)'),
     ],
     template: { props: { list: ['First item', 'Second item'] } },
   },
@@ -113,8 +116,9 @@ export const blockEditing = {
         name: 'list',
         label: 'Items',
         type: 'list',
-        hint: 'One item per line; indent two spaces for a sub-list. HTML allowed.',
+        hint: 'One item per line; indent two spaces for a sub-list, and start its first line with ** to make it bold. HTML allowed.',
       },
+      bool('bold', 'Bold (top-level items)'),
     ],
     template: { props: { list: ['First step', 'Second step'] } },
   },
@@ -281,13 +285,23 @@ export function outlineToNodes(text, topicType) {
   return convert(parseIndented(text), start)
 }
 
-export function listToText(list, depth = 0) {
+/** A bold sub-list's first line starts with this. */
+const BOLD_SUBLIST = '** '
+
+export function listToText(list, depth = 0, bold = false) {
   return (list ?? [])
-    .map((item) => (Array.isArray(item) ? listToText(item, depth + 1) : `${'  '.repeat(depth)}${item}`))
+    .map((item, index) => {
+      if (isSublist(item)) return listToText(sublistItems(item), depth + 1, sublistBold(item))
+
+      return `${'  '.repeat(depth)}${bold && index === 0 ? BOLD_SUBLIST : ''}${item}`
+    })
     .join('\n')
 }
 
-/** Inverse of listToText: indentation becomes nested arrays, which the list components render as sub-lists. */
+/**
+ * Inverse of listToText: indentation becomes nested arrays, which the list components render as
+ * sub-lists; one whose first line starts with “** ” is bold.
+ */
 export function textToList(text) {
   const root = []
   const stack = [{ depth: 0, items: root }]
@@ -295,14 +309,17 @@ export function textToList(text) {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue
 
+    let item = line.trim()
     const depth = Math.floor(line.match(/^[\t ]*/)[0].replace(/\t/g, '  ').length / 2)
     while (depth < stack[stack.length - 1].depth) stack.pop()
     if (depth > stack[stack.length - 1].depth) {
+      const bold = item.startsWith(BOLD_SUBLIST)
+      if (bold) item = item.slice(BOLD_SUBLIST.length)
       const nested = []
-      stack[stack.length - 1].items.push(nested)
+      stack[stack.length - 1].items.push(makeSublist(nested, bold))
       stack.push({ depth, items: nested })
     }
-    stack[stack.length - 1].items.push(line.trim())
+    stack[stack.length - 1].items.push(item)
   }
 
   return root

@@ -81,8 +81,8 @@ export const registry = {
   CodeBlock: { component: CodeBlock, label: 'Code', category: 'Media', props: ['code', 'label', 'lang'] },
   Mermaid: { component: Mermaid, label: 'Diagram (Mermaid)', category: 'Media', props: ['code'] },
 
-  BulletList: { component: BulletList, label: 'Bullet List', category: 'Lists', props: ['list'] },
-  NumberedList: { component: NumberedList, label: 'Numbered List', category: 'Lists', props: ['list'] },
+  BulletList: { component: BulletList, label: 'Bullet List', category: 'Lists', props: ['list', 'bold'] },
+  NumberedList: { component: NumberedList, label: 'Numbered List', category: 'Lists', props: ['list', 'bold'] },
   ConceptList: {
     component: ConceptList,
     label: 'Concept List',

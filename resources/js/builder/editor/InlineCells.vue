@@ -4,11 +4,23 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } f
 import { registry } from '../registry.js'
 import InlineCell from './InlineCell.vue'
 import { placeCaret } from './caret.js'
-import { addressKey, append, insertAfter, readAt, removeAt, writeAt } from './inlineData.js'
+import {
+  addressKey,
+  append,
+  indentAt,
+  insertAfter,
+  outdentAt,
+  readAt,
+  removeAt,
+  setSublistBoldAt,
+  sublistBoldAt,
+  writeAt,
+} from './inlineData.js'
 
 /**
  * A table or list edited in place: the same component, with every cell/item swapped for an editable one
- * through its scoped slots. Tab moves between cells; Enter adds a list item or goes down a row;
+ * through its scoped slots. Tab moves between cells (in a bullet/numbered list, Tab / Shift+Tab nest an
+ * item under the one before it or move it back out); Enter adds a list item or goes down a row;
  * Backspace on an empty item removes it; Escape or clicking elsewhere finishes.
  */
 const props = defineProps({
@@ -17,12 +29,14 @@ const props = defineProps({
   rule: { type: Object, required: true },
   coords: { type: Object, default: null },
 })
-const emit = defineEmits(['update', 'done'])
+// update: the rule's prop; update-prop: another prop of the block (a list's own bold)
+const emit = defineEmits(['update', 'update-prop', 'done'])
 
 const root = useTemplateRef('root')
 const definition = computed(() => registry[props.node.type])
 const shape = computed(() => props.rule.shape)
 const isTable = computed(() => shape.value === 'table')
+const nestable = computed(() => shape.value === 'list')
 const value = computed(() => props.node.props?.[props.rule.prop] ?? [])
 
 // the cell with the caret, and the one to move it to after a change that re-renders the list
@@ -53,6 +67,7 @@ function cell(address, cellValue) {
     nullable: rule.nullable,
     block: isTable.value,
     focus: focusKey.value === addressKey(address),
+    nestable: nestable.value,
     onFocused: () => {
       active.value = address
       if (focusKey.value === addressKey(address)) focusKey.value = null
@@ -60,8 +75,35 @@ function cell(address, cellValue) {
     onUpdate: (next) => save(writeAt(value.value, shape.value, address, next)),
     onEnter: () => enter(address),
     onRemoveEmpty: () => removeEmpty(address),
+    onIndent: () => nest(indentAt, address),
+    onOutdent: () => nest(outdentAt, address),
     onDone: () => emit('done'),
   }
+}
+
+// bold is set per list: the one holding the caret (the top level's is the block's `bold` prop)
+const inSublist = computed(() => (active.value?.path.length ?? 0) > 1)
+const listBold = computed(() => {
+  if (!active.value) return false
+
+  return inSublist.value ? sublistBoldAt(value.value, active.value) : !!props.node.props?.bold
+})
+
+function toggleBold() {
+  if (!active.value) return
+  if (inSublist.value) save(setSublistBoldAt(value.value, active.value, !listBold.value))
+  else emit('update-prop', 'bold', !listBold.value)
+}
+
+/** Indent or outdent:the item moves to another place in the list, and the caret goes with it. */
+function nest(change, address = active.value) {
+  const result = address && change(value.value, address)
+  if (!result) return
+  moveTo(result.address)
+  // the cell that had the caret may be reused for another item, which it won't redraw while focused
+  document.activeElement?.blur()
+  active.value = null
+  save(result.value)
 }
 
 function moveTo(address) {
@@ -144,6 +186,33 @@ const noun = computed(() => (isTable.value ? 'row' : 'item'))
         Add {{ noun }}
       </button>
       <button :disabled="!active" class="rt-button" type="button" @click="remove()">Remove {{ noun }}</button>
+      <template v-if="nestable">
+        <button
+          :disabled="!active"
+          class="rt-button"
+          title="Make it a sub-item of the item before (Tab)"
+          type="button"
+          @click="nest(indentAt)">
+          Indent
+        </button>
+        <button
+          :disabled="!active || active.path.length < 2"
+          class="rt-button"
+          title="Move it up a level (Shift+Tab)"
+          type="button"
+          @click="nest(outdentAt)">
+          Outdent
+        </button>
+        <button
+          :aria-pressed="listBold"
+          :class="['rt-button font-bold', { 'rt-active': listBold }]"
+          :disabled="!active"
+          :title="`Bold every item of this ${inSublist ? 'sub-list' : 'list'} (not its sub-lists)`"
+          type="button"
+          @click="toggleBold">
+          {{ inSublist ? 'Bold sub-list' : 'Bold list' }}
+        </button>
+      </template>
       <button class="rt-button" title="Done (Esc)" type="button" @click="emit('done')">Done</button>
     </div>
 

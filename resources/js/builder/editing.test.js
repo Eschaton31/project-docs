@@ -69,6 +69,15 @@ describe('list text', () => {
     )
     expect(textToList(listToText(list))).toEqual(list)
   })
+
+  it('marks a bold sub-list with ** on its first line', () => {
+    const list = ['Phases', { bold: true, list: ['Planning', ['notes']] }, 'Done']
+
+    expect(listToText(list)).toBe('Phases\n  ** Planning\n    notes\nDone')
+    expect(textToList(listToText(list))).toEqual(list)
+    // only where a sub-list starts
+    expect(textToList('** literal\n  a\n  ** b')).toEqual(['** literal', ['a', '** b']])
+  })
 })
 
 describe('concept list text', () => {

@@ -7,7 +7,8 @@ import { fitsRichText } from './richText.js'
 /**
  * One table cell or list item edited in place. Keeps inline formatting (Ctrl+B/I/U, Ctrl+E for code);
  * `lines` cells take several lines (Enter adds one) and save as an array when they have more than one.
- * Enter elsewhere, Backspace on an empty item and focus are reported to the list/table around it.
+ * Enter elsewhere, Backspace on an empty item, Tab / Shift+Tab on a nestable item and focus are reported
+ * to the list/table around it.
  */
 const props = defineProps({
   value: { type: [String, Number, Array], default: null },
@@ -21,8 +22,10 @@ const props = defineProps({
   block: Boolean,
   // move the caret here (after Enter, Add row, …)
   focus: Boolean,
+  // a bullet/numbered list item: Tab / Shift+Tab nest it under the item before, or move it back out
+  nestable: Boolean,
 })
-const emit = defineEmits(['update', 'enter', 'remove-empty', 'focused', 'done'])
+const emit = defineEmits(['update', 'enter', 'remove-empty', 'focused', 'done', 'indent', 'outdent'])
 
 const el = useTemplateRef('el')
 const asLines = (value) => (Array.isArray(value) ? value : [value ?? '']).map(String)
@@ -81,6 +84,9 @@ function onKeydown(event) {
     event.preventDefault()
     if (props.lines && !props.plain) document.execCommand('insertLineBreak')
     else emit('enter')
+  } else if (event.key === 'Tab' && props.nestable) {
+    event.preventDefault()
+    emit(event.shiftKey ? 'outdent' : 'indent')
   } else if (event.key === 'Backspace' && el.value.textContent === '') {
     event.preventDefault()
     emit('remove-empty')

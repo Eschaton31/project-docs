@@ -137,6 +137,42 @@ describe('editing lists in place', () => {
     expect(document.activeElement).toBe(cells()[1].element)
   })
 
+  it('nests an item with Tab and moves it back out with Shift+Tab', async () => {
+    const { cells, saves } = await edit('NumberedList', { list: ['Offline', 'Migrate', 'Verify'] })
+
+    await cells()[1].trigger('keydown', { key: 'Tab' })
+    await flushPromises()
+    expect(saves.at(-1)).toEqual(['Offline', ['Migrate'], 'Verify'])
+    expect(document.activeElement).toBe(cells()[1].element)
+    expect(cells().map((cell) => cell.text())).toEqual(['Offline', 'Migrate', 'Verify'])
+
+    await cells()[1].trigger('keydown', { key: 'Tab', shiftKey: true })
+    await flushPromises()
+    expect(saves.at(-1)).toEqual(['Offline', 'Migrate', 'Verify'])
+
+    // the first item has nothing to nest under
+    await cells()[0].trigger('keydown', { key: 'Tab' })
+    expect(saves).toHaveLength(2)
+  })
+
+  it('bolds the list holding the caret: the top level as a prop, a sub-list on its own', async () => {
+    const { wrapper, cells, saves } = await edit('BulletList', { list: ['Phases', ['Planning'], 'Done'] })
+    const boldButton = () => wrapper.findAll('button').find((b) => /^Bold/.test(b.text()))
+
+    await cells()[0].trigger('focus')
+    expect(boldButton().text()).toBe('Bold list')
+    await boldButton().trigger('click')
+    expect(wrapper.emitted('update-prop')).toEqual([['bold', true]])
+    expect(saves).toEqual([])
+
+    await cells()[1].trigger('focus')
+    expect(boldButton().text()).toBe('Bold sub-list')
+    await boldButton().trigger('click')
+    await flushPromises()
+    expect(saves.at(-1)).toEqual(['Phases', { bold: true, list: ['Planning'] }, 'Done'])
+    expect(boldButton().attributes('aria-pressed')).toBe('true')
+  })
+
   it('goes from a term to its definition, then to a new concept', async () => {
     const { cells, saves } = await edit('ConceptList', { list: [{ id: 'Primary', value: 'Data Management Team' }] })
 

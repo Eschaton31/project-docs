@@ -92,6 +92,7 @@ export function createInlineEdit({ editing, update, stop }) {
             rule,
             coords: current.coords,
             onUpdate: (value) => update(node.id, rule.prop, value),
+            onUpdateProp: (prop, value) => update(node.id, prop, value),
             onDone: stop,
           }),
         }
