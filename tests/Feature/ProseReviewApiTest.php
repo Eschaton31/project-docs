@@ -25,6 +25,8 @@ class ProseReviewApiTest extends TestCase
     {
         parent::setUp();
 
+        // these tests start reviews from the editor, which only the API runner does
+        config(['ai-review.runner' => 'api']);
         $this->actingAs($this->admin = User::factory()->admin()->create());
         $this->document = Document::where('slug', $this->postJson('/api/documents', ['title' => 'Setup Guide'])->json('document.slug'))->firstOrFail();
         [$this->topic] = $this->postJson("/api/documents/{$this->document->slug}/blocks/tree", ['blocks' => [
@@ -140,6 +142,17 @@ class ProseReviewApiTest extends TestCase
         $this->postJson("/api/documents/{$this->document->slug}/reviews")->assertAccepted();
         $this->postJson("/api/documents/{$this->document->slug}/reviews")->assertAccepted();
         $this->postJson("/api/documents/{$this->document->slug}/reviews")->assertTooManyRequests();
+    }
+
+    public function test_with_the_claude_code_runner_the_editor_cannot_start_reviews(): void
+    {
+        ProseReviewer::fake();
+        config(['ai-review.runner' => 'claude-code']);
+
+        $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('runner', 'claude-code');
+        $this->postJson("/api/documents/{$this->document->slug}/reviews")
+            ->assertJsonValidationErrors(['review' => "run /prose-review {$this->document->slug}"]);
+        ProseReviewer::assertNeverPrompted();
     }
 
     public function test_the_routes_are_gone_when_the_feature_is_off(): void

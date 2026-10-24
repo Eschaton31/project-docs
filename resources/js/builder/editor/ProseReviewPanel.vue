@@ -54,7 +54,29 @@ const scopeChoices = computed(() => {
 const running = computed(() => ['queued', 'running'].includes(reviews.review?.status))
 const kinds = computed(() => [wording.value && 'text', structure.value && 'restructure'].filter(Boolean))
 
+// reviews run in Claude Code with the user's own Claude plan: show the command to run there
+const inClaudeCode = computed(() => reviews.runner === 'claude-code')
+const command = computed(() =>
+  [
+    `/prose-review ${editor.document.slug}`,
+    scope.value !== 'document' && `--block=${scope.value}`,
+    kinds.value.length === 1 && `--kinds=${kinds.value[0]}`,
+  ]
+    .filter(Boolean)
+    .join(' ')
+)
+const copied = ref(false)
+
+async function copyCommand() {
+  await navigator.clipboard?.writeText(command.value)
+  copied.value = true
+  setTimeout(() => (copied.value = false), 2000)
+}
+
+const MODEL_NAMES = { sonnet: 'Sonnet', opus: 'Opus', 'claude-code': 'Claude Code' }
+
 function startReview() {
+  if (inClaudeCode.value) return
   reviews.start(editor.document.slug, {
     blockId: scope.value === 'document' ? null : scope.value,
     kinds: kinds.value,
@@ -159,12 +181,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-700">
         <label class="flex items-center gap-1.5"><input v-model="wording" type="checkbox" /> Wording</label>
         <label class="flex items-center gap-1.5"><input v-model="structure" type="checkbox" /> Structure</label>
-        <span class="mx-1 h-4 w-px bg-slate-200" />
-        <label v-for="[value, label, hint] in MODELS" :key="value" :title="hint" class="flex items-center gap-1.5">
-          <input v-model="model" :value name="model" type="radio" /> {{ label }}
-        </label>
+        <template v-if="!inClaudeCode">
+          <span class="mx-1 h-4 w-px bg-slate-200" />
+          <label v-for="[value, label, hint] in MODELS" :key="value" :title="hint" class="flex items-center gap-1.5">
+            <input v-model="model" :value name="model" type="radio" /> {{ label }}
+          </label>
+        </template>
+      </div>
+      <div v-if="inClaudeCode" class="space-y-1.5" data-claude-code>
+        <p class="text-slate-600">Reviews run in Claude Code with your own Claude plan. In this project, run:</p>
+        <div class="flex items-center gap-2">
+          <code class="grow truncate rounded bg-white px-2 py-1 ring-1 ring-slate-200">{{ command }}</code>
+          <button :disabled="!kinds.length" class="toolbar-button" type="button" @click="copyCommand">
+            {{ copied ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+        <p class="text-slate-500">
+          The suggestions appear here when it's done.
+          <button class="underline" type="button" @click="reviews.showLatest()">Check now</button>
+        </p>
       </div>
       <button
+        v-else
         :disabled="reviews.starting || running || !kinds.length"
         class="rounded bg-bene-teal px-3 py-1 font-semibold text-white disabled:opacity-40"
         type="submit">
@@ -180,12 +218,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <code>composer dev</code>); check that it's running.
       </p>
       <p v-if="running" class="text-slate-600">Claude is reading the document. This usually takes a minute or two.</p>
+      <p v-else-if="reviews.review?.status === 'awaiting'" class="text-slate-600">
+        Claude Code is reviewing (review {{ reviews.review.id }}). Its suggestions appear here once they're imported.
+      </p>
       <p v-else-if="reviews.review?.status === 'failed'" class="text-rose-700">
         The review failed: {{ reviews.review.error }}
       </p>
       <p v-else-if="reviews.review" class="text-slate-500">
         {{ pendingCount }} to go of {{ reviews.suggestions.length }} suggestions ·
-        {{ reviews.review.model === 'opus' ? 'Opus' : 'Sonnet' }} · {{ ago(reviews.review.createdAt) }}
+        {{ MODEL_NAMES[reviews.review.model] ?? reviews.review.model }} · {{ ago(reviews.review.createdAt) }}
       </p>
     </div>
 

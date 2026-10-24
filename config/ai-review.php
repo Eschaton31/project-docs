@@ -5,6 +5,15 @@ return [
     // Off hides the editor button and makes the review routes 404.
     'enabled' => (bool) env('AI_REVIEW_ENABLED', true),
 
+    // Who runs the model:
+    //   claude-code  in Claude Code with your own Claude plan: /prose-review in this repo exports the text,
+    //                reviews it and imports the results (php artisan prose-review:export / :import)
+    //   api          from the queue, with ANTHROPIC_API_KEY; the editor's Review button starts it
+    'runner' => env('AI_REVIEW_RUNNER', 'claude-code'),
+
+    // Where prose-review:export writes the instructions and prompts, and :import reads the answers.
+    'work_dir' => env('AI_REVIEW_WORK_DIR', storage_path('app/prose-reviews')),
+
     // The models an admin can pick per review; 'default' is used when they don't.
     'models' => [
         'sonnet' => env('AI_REVIEW_MODEL', 'claude-sonnet-5-5'),

@@ -274,6 +274,22 @@ Commit: `feat(ai): prose review panel in the editor`
 - **The SPA learns whether to show the feature** from `abilities.aiReview` on the user payload (admin and
   `AI_REVIEW_ENABLED`).
 
+## Running reviews in Claude Code (added after the plan)
+
+`AI_REVIEW_RUNNER=claude-code` (the default) runs reviews in Claude Code with the user's own Claude plan instead
+of from the queue with an API key; a Pro/Max subscription can't back a multi-user server.
+
+1. `/prose-review <slug> [--block=<id>] [--kinds=...]` (`.claude/skills/prose-review`) runs
+   `php artisan prose-review:export`, which saves the block tree and its chunking on the review (`snapshot`,
+   status `awaiting`) and writes `instructions.md` (the same brief `ProseReviewer` sends) and `chunk-N.md` to
+   `storage/app/prose-reviews/<id>/`.
+2. Claude Code reviews each chunk and writes `chunk-N.json` in the structured-output shape.
+3. `php artisan prose-review:import <id>` validates every answer with `SuggestionValidator` against the saved
+   snapshot (all or nothing), saves the suggestions and marks the review done.
+
+The editor panel shows the command to run for the chosen scope instead of a Review button, and picks up the
+review when it is exported and imported. `ReviewRun` holds the steps both runners share.
+
 ## Open items to confirm during Task 0
 
 - Exact laravel/ai agent, structured output and fake APIs (read the installed package).

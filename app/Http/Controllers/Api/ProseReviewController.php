@@ -24,11 +24,16 @@ class ProseReviewController extends Controller
     {
         $reviews = $document->proseReviews()->latest('id')->limit(self::RECENT)->get();
 
-        return response()->json(['reviews' => $reviews->map->toSummary()]);
+        // claude-code: reviews are started from Claude Code (/prose-review), not from the editor
+        return response()->json(['reviews' => $reviews->map->toSummary(), 'runner' => config('ai-review.runner')]);
     }
 
     public function store(StoreProseReviewRequest $request, Document $document, DocumentTree $tree): JsonResponse
     {
+        if (config('ai-review.runner') !== 'api') {
+            throw ValidationException::withMessages(['review' => "Reviews run in Claude Code: run /prose-review {$document->slug} there."]);
+        }
+
         $running = $document->proseReviews()->whereIn('status', [ProseReview::QUEUED, ProseReview::RUNNING])->exists();
         if ($running) {
             throw ValidationException::withMessages(['review' => 'A review of this document is already running.']);

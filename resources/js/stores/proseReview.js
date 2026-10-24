@@ -7,6 +7,7 @@ import { ref } from 'vue'
 import { useEditorStore } from './editor.js'
 
 const POLL_MS = 3000
+const AWAITING_POLL_MS = 15_000
 const SLOW_AFTER_MS = 30_000
 
 /**
@@ -27,6 +28,10 @@ export const useProseReviewStore = defineStore('proseReview', () => {
   const notice = ref(null)
   const busy = ref(new Set())
 
+  // 'claude-code': reviews are started from Claude Code (/prose-review) with the user's own plan, not from here
+  const runner = ref('api')
+
+  let documentSlug = null
   let documentId = null
   let pollTimer = null
   let stopListening = null
@@ -34,6 +39,8 @@ export const useProseReviewStore = defineStore('proseReview', () => {
   function openPanel({ scope = null } = {}) {
     scopeId.value = scope
     open.value = true
+    // waiting reviews are only polled while the panel is open
+    if (review.value?.status === 'awaiting') refresh().catch(report)
   }
 
   /** Shows the latest review of the document (if any) and follows its progress. */
@@ -41,12 +48,21 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     if (documentId === document.id) return
     reset()
     documentId = document.id
+    documentSlug = document.slug
+    // also announces reviews exported from Claude Code, which this tab didn't start
     stopListening = listenToReviews(document.id, ({ review: updated }) => {
-      if (updated.id === review.value?.id) refresh()
+      review.value = updated
+      refresh().catch(report)
     })
 
+    await showLatest()
+  }
+
+  /** The document's newest review: on opening, and to pick up one started in Claude Code. */
+  async function showLatest() {
     try {
-      const { data } = await http.get(`/api/documents/${document.slug}/reviews`)
+      const { data } = await http.get(`/api/documents/${documentSlug}/reviews`)
+      runner.value = data.runner ?? 'api'
       if (data.reviews[0]) {
         review.value = data.reviews[0]
         await refresh()
@@ -81,9 +97,14 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     review.value = data.review
     suggestions.value = data.suggestions
 
-    const waiting = ['queued', 'running'].includes(data.review.status)
-    slow.value = data.review.status === 'queued' && Date.now() - new Date(data.review.createdAt) > SLOW_AFTER_MS
-    if (waiting) pollTimer = setTimeout(() => refresh().catch(report), POLL_MS)
+    const { status } = data.review
+    slow.value = status === 'queued' && Date.now() - new Date(data.review.createdAt) > SLOW_AFTER_MS
+    if (status === 'queued' || status === 'running') {
+      pollTimer = setTimeout(() => refresh().catch(report), POLL_MS)
+    } else if (status === 'awaiting' && open.value) {
+      // exported to Claude Code: done whenever someone runs the import, which may be much later
+      pollTimer = setTimeout(() => refresh().catch(report), AWAITING_POLL_MS)
+    }
   }
 
   async function accept(suggestion) {
@@ -150,7 +171,8 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     clearTimeout(pollTimer)
     stopListening?.()
     stopListening = null
-    documentId = null
+    documentId = documentSlug = null
+    runner.value = 'api'
     review.value = null
     suggestions.value = []
     slow.value = false
@@ -168,8 +190,10 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     error,
     notice,
     busy,
+    runner,
     openPanel,
     load,
+    showLatest,
     start,
     refresh,
     accept,

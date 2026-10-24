@@ -3,25 +3,34 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['document_id', 'scope_block_id', 'requested_by', 'model', 'kinds', 'status', 'error', 'document_seq', 'input_tokens', 'output_tokens'])]
+#[Fillable(['document_id', 'scope_block_id', 'requested_by', 'model', 'kinds', 'status', 'error', 'document_seq', 'snapshot', 'input_tokens', 'output_tokens'])]
+#[Hidden(['snapshot'])]
 class ProseReview extends Model
 {
     public const QUEUED = 'queued';
 
     public const RUNNING = 'running';
 
+    // exported for Claude Code; waiting for its results to be imported
+    public const AWAITING = 'awaiting';
+
     public const DONE = 'done';
 
     public const FAILED = 'failed';
+
+    // the model column of reviews run in Claude Code (with the user's own Claude plan)
+    public const CLAUDE_CODE = 'claude-code';
 
     protected function casts(): array
     {
         return [
             'kinds' => 'array',
+            'snapshot' => 'array',
             'document_seq' => 'integer',
             'input_tokens' => 'integer',
             'output_tokens' => 'integer',

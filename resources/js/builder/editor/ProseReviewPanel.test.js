@@ -173,6 +173,31 @@ describe('ProseReviewPanel', () => {
     expect(editor.get('r1').props.html).toBe('In order to install it, you need PHP.')
   })
 
+  it('with the Claude Code runner, shows the command to run there instead of starting one', async () => {
+    const list = http.get.getMockImplementation()
+    http.get.mockImplementation(async (url) =>
+      url === '/api/documents/doc/reviews'
+        ? { data: { runner: 'claude-code', reviews: [{ id: 11, status: 'awaiting', model: 'claude-code' }] } }
+        : url === '/api/reviews/11'
+          ? { data: { review: { id: 11, status: 'awaiting', model: 'claude-code' }, suggestions: [] } }
+          : list(url)
+    )
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-claude-code] code').text()).toBe('/prose-review doc')
+    expect(wrapper.find('input[type="radio"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Claude Code is reviewing (review 11)')
+
+    await wrapper.find('select[aria-label="What to review"]').setValue('document')
+    const wordingOnly = wrapper.findAll('label').find((label) => label.text() === 'Structure')
+    await wordingOnly.find('input').setValue(false)
+    expect(wrapper.find('[data-claude-code] code').text()).toBe('/prose-review doc --kinds=text')
+
+    await wrapper.find('form').trigger('submit')
+    expect(http.post.mock.calls.filter(([url]) => url.endsWith('/reviews'))).toEqual([])
+    wrapper.unmount()
+  })
+
   it('starts a review of the chosen section with the chosen model', async () => {
     editor.select('r1')
     const wrapper = await mountPanel()

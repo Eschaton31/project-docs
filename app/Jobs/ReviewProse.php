@@ -4,22 +4,17 @@ namespace App\Jobs;
 
 use App\Ai\Agents\ProseReviewer;
 use App\Ai\ProseExtractor;
-use App\Ai\ProseSnapshot;
 use App\Ai\ReviewPrompt;
-use App\Ai\SuggestionValidator;
-use App\Events\ProseReviewUpdated;
-use App\Models\Block;
+use App\Ai\ReviewRun;
 use App\Models\ProseReview;
-use App\Models\ProseSuggestion;
 use App\Services\DocumentTree;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Reviews a document (or one topic) chunk by chunk and saves the suggestions that pass validation.
- * Nothing in the document changes here; an admin applies suggestions one by one.
+ * Reviews a document (or one topic) chunk by chunk through the API and saves the suggestions that pass
+ * validation. Nothing in the document changes here; an admin applies suggestions one by one.
  */
 class ReviewProse implements ShouldQueue
 {
@@ -39,76 +34,32 @@ class ReviewProse implements ShouldQueue
     public function handle(DocumentTree $tree): void
     {
         $review = $this->review;
-        $document = $review->document;
-        $review->update(['status' => ProseReview::RUNNING, 'document_seq' => $document->seq]);
-        $this->broadcast();
+        $review->update(['status' => ProseReview::RUNNING]);
+        ReviewRun::broadcast($review);
 
-        $nodes = $review->scope_block_id
-            ? [$tree->subtree(Block::query()->whereBelongsTo($document)->findOrFail($review->scope_block_id))]
-            : $tree->build($document);
-        $snapshot = (new ProseExtractor)->extract($nodes);
-
+        $snapshot = (new ProseExtractor)->extract(ReviewRun::read($review, $tree));
+        $chunks = ReviewPrompt::chunks($snapshot, config('ai-review.max_chars_per_chunk'));
         $usage = ['input_tokens' => 0, 'output_tokens' => 0];
         $dropped = [];
-        $chunks = ReviewPrompt::chunks($snapshot, config('ai-review.max_chars_per_chunk'));
 
         foreach ($chunks as $chunk) {
-            [$rows, $chunkUsage, $chunkDropped] = $this->reviewChunk($snapshot, $chunk);
-            foreach ($rows as $row) {
-                $review->suggestions()->create([...$row, 'status' => ProseSuggestion::PENDING]);
-            }
-            $usage['input_tokens'] += $chunkUsage['input_tokens'];
-            $usage['output_tokens'] += $chunkUsage['output_tokens'];
-            foreach ($chunkDropped as $reason => $count) {
-                $dropped[$reason] = ($dropped[$reason] ?? 0) + $count;
-            }
+            $response = ProseReviewer::make()->prompt(
+                ReviewPrompt::render($snapshot, $chunk, $review->kinds),
+                model: config('ai-review.models')[$review->model],
+                timeout: config('ai-review.timeout'),
+            );
+
+            $dropped = ReviewRun::addDropped($dropped, ReviewRun::save($review, $snapshot, $chunk, $response->structured));
+            $usage['input_tokens'] += $response->usage->inputTokens;
+            $usage['output_tokens'] += $response->usage->outputTokens;
         }
 
-        $review->update(['status' => ProseReview::DONE, 'error' => null, ...$usage]);
-        $this->broadcast();
-
-        Log::info('Prose review finished', [
-            'review' => $review->id,
-            'document' => $document->id,
-            'scope' => $review->scope_block_id,
-            'model' => $review->model,
-            'chunks' => count($chunks),
-            'suggestions' => $review->suggestions()->count(),
-            'dropped' => $dropped,
-            ...$usage,
-        ]);
+        ReviewRun::finish($review, $usage, count($chunks), $dropped);
     }
 
     public function failed(?Throwable $exception): void
     {
         $this->review->update(['status' => ProseReview::FAILED, 'error' => $exception?->getMessage()]);
-        $this->broadcast();
-    }
-
-    private function broadcast(): void
-    {
-        // live progress is a nicety; the editor also polls, so a broadcasting outage must not fail the review
-        rescue(fn () => event(new ProseReviewUpdated($this->review)), report: true);
-    }
-
-    /**
-     * @return array{0: list<array>, 1: array{input_tokens: int, output_tokens: int}, 2: array<string, int>}
-     */
-    private function reviewChunk(ProseSnapshot $snapshot, array $chunk): array
-    {
-        $response = ProseReviewer::make()->prompt(
-            ReviewPrompt::render($snapshot, $chunk, $this->review->kinds),
-            model: config('ai-review.models')[$this->review->model],
-            timeout: config('ai-review.timeout'),
-        );
-
-        $validator = new SuggestionValidator($snapshot, $chunk, $this->review->kinds);
-        $rows = $validator->validate($response->structured);
-
-        return [
-            $rows,
-            ['input_tokens' => $response->usage->inputTokens, 'output_tokens' => $response->usage->outputTokens],
-            $validator->dropped(),
-        ];
+        ReviewRun::broadcast($this->review);
     }
 }
