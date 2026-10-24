@@ -99,9 +99,12 @@ function render() {
 }
 
 // gantt draws one background row per task, classed by its section; rule a line wherever the
-// section changes so neighbouring groups don't run together
+// section changes so neighbouring groups don't run together. rows are drawn in start-date order,
+// not top to bottom, so sort them by position first
 function divideSections(el) {
-  const rows = [...el.querySelectorAll('rect.section')]
+  const rows = [...el.querySelectorAll('rect.section')].sort(
+    (a, b) => Number(a.getAttribute('y')) - Number(b.getAttribute('y'))
+  )
 
   rows.forEach((row, i) => {
     if (i === 0 || row.getAttribute('class') === rows[i - 1].getAttribute('class')) return
@@ -114,7 +117,7 @@ function divideSections(el) {
     line.setAttribute('x2', x + Number(row.getAttribute('width')))
     line.setAttribute('y1', y)
     line.setAttribute('y2', y)
-    row.after(line)
+    row.parentNode.append(line) // after every row, so later-drawn rows can't paint over it
   })
 }
 </script>
