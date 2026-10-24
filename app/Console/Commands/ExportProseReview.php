@@ -79,7 +79,7 @@ class ExportProseReview extends Command
         }
 
         $this->line("Review: {$review->id}");
-        $this->line("Folder: {$dir}");
+        $this->line('Folder: '.str_replace('\\', '/', $dir));
         $this->line('Instructions: '.str_replace('\\', '/', "{$dir}/instructions.md"));
         foreach (array_keys($chunks) as $i) {
             $n = $i + 1;
