@@ -63,6 +63,11 @@ class Document extends Model
         return $this->hasMany(Export::class);
     }
 
+    public function proseReviews(): HasMany
+    {
+        return $this->hasMany(ProseReview::class);
+    }
+
     /**
      * Document settings as sent to clients (the block tree is sent separately).
      */
