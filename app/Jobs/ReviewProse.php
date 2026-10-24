@@ -7,6 +7,7 @@ use App\Ai\ProseExtractor;
 use App\Ai\ProseSnapshot;
 use App\Ai\ReviewPrompt;
 use App\Ai\SuggestionValidator;
+use App\Events\ProseReviewUpdated;
 use App\Models\Block;
 use App\Models\ProseReview;
 use App\Models\ProseSuggestion;
@@ -40,6 +41,7 @@ class ReviewProse implements ShouldQueue
         $review = $this->review;
         $document = $review->document;
         $review->update(['status' => ProseReview::RUNNING, 'document_seq' => $document->seq]);
+        $this->broadcast();
 
         $nodes = $review->scope_block_id
             ? [$tree->subtree(Block::query()->whereBelongsTo($document)->findOrFail($review->scope_block_id))]
@@ -63,6 +65,7 @@ class ReviewProse implements ShouldQueue
         }
 
         $review->update(['status' => ProseReview::DONE, 'error' => null, ...$usage]);
+        $this->broadcast();
 
         Log::info('Prose review finished', [
             'review' => $review->id,
@@ -79,6 +82,13 @@ class ReviewProse implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         $this->review->update(['status' => ProseReview::FAILED, 'error' => $exception?->getMessage()]);
+        $this->broadcast();
+    }
+
+    private function broadcast(): void
+    {
+        // live progress is a nicety; the editor also polls, so a broadcasting outage must not fail the review
+        rescue(fn () => event(new ProseReviewUpdated($this->review)), report: true);
     }
 
     /**

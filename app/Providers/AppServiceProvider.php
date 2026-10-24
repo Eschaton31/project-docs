@@ -5,8 +5,11 @@ namespace App\Providers;
 use App\Models\User;
 use App\Pdf\BrowsershotRenderer;
 use App\Pdf\PdfRenderer;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -26,6 +29,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::define('admin', fn (User $user) => $user->isAdmin());
+
+        // each review makes paid model calls
+        RateLimiter::for('ai-review', fn (Request $request) => Limit::perHour(config('ai-review.rate_limit_per_hour'))->by($request->user()?->id ?: $request->ip()));
 
         if ($this->app->runningConsoleCommand('dev')) {
             $this->serveOnHostIp();

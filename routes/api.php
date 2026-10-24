@@ -8,7 +8,10 @@ use App\Http\Controllers\Api\HistoryController;
 use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\LockController;
 use App\Http\Controllers\Api\PrintController;
+use App\Http\Controllers\Api\ProseReviewController;
+use App\Http\Controllers\Api\ProseSuggestionController;
 use App\Http\Controllers\Api\SnapshotController;
+use App\Http\Middleware\AiReviewEnabled;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +52,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/images', [ImageController::class, 'index']);
     Route::post('/images', [ImageController::class, 'store']);
+
+    // AI prose review: admins only
+    Route::middleware([AiReviewEnabled::class, 'can:admin'])->group(function () {
+        Route::get('/documents/{document}/reviews', [ProseReviewController::class, 'index']);
+        Route::post('/documents/{document}/reviews', [ProseReviewController::class, 'store'])->middleware('throttle:ai-review');
+        Route::get('/reviews/{review}', [ProseReviewController::class, 'show']);
+        Route::post('/reviews/{review}/accept-rule', [ProseSuggestionController::class, 'acceptRule']);
+        Route::post('/suggestions/{suggestion}/accept', [ProseSuggestionController::class, 'accept']);
+        Route::post('/suggestions/{suggestion}/dismiss', [ProseSuggestionController::class, 'dismiss']);
+    });
 });
 
 // print data for headless Chrome (PDF export): no session, only short-lived signed URLs
