@@ -53,3 +53,6 @@ __screenshots__/
 # uploaded document images
 /public/img/uploads
 .npmrc
+
+# repowise owner-digest key (local)
+.repowise/events.key
