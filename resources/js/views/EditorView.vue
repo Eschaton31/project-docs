@@ -6,28 +6,43 @@ import OutlineDialog from '@/builder/editor/OutlineDialog.vue'
 import OutlineTree from '@/builder/editor/OutlineTree.vue'
 import PreviewModal from '@/builder/editor/PreviewModal.vue'
 import PropertiesPanel from '@/builder/editor/PropertiesPanel.vue'
+import ProseReviewPanel from '@/builder/editor/ProseReviewPanel.vue'
 import UserBadge from '@/builder/editor/UserBadge.vue'
 import { useExport } from '@/builder/editor/useExport.js'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import { useAuthStore } from '@/stores/auth.js'
 import { useEditorStore } from '@/stores/editor.js'
+import { useProseReviewStore } from '@/stores/proseReview.js'
 
 const route = useRoute()
 const store = useEditorStore()
+const reviews = useProseReviewStore()
+const auth = useAuthStore()
 const pdf = useExport()
 
 const loadError = ref(null)
 const showPreview = ref(false)
 const showOutline = ref(false)
 const showHistory = ref(false)
+const canReview = computed(() => !!auth.user?.abilities?.aiReview)
+
+// the history and the AI review share the drawer space
+watch(showHistory, (open) => open && (reviews.open = false))
+watch(
+  () => reviews.open,
+  (open) => open && (showHistory.value = false)
+)
 
 const slug = computed(() => route.params.slug)
 const statusText = computed(() => ({ saving: 'Saving…', saved: 'All changes saved', error: 'Not saved' })[store.status])
 
 async function load() {
   loadError.value = null
+  reviews.reset()
+  reviews.open = false
   try {
     await store.load(slug.value)
     document.title = `${store.document.title} · Project Docs`
@@ -91,6 +106,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener('pagehide', onPageHide)
   store.dispose()
+  reviews.reset()
 })
 onBeforeRouteLeave(() => store.flushAll())
 </script>
@@ -133,6 +149,15 @@ onBeforeRouteLeave(() => store.flushAll())
         <span class="mx-2 h-5 w-px bg-slate-200" />
         <button :disabled="!store.document" class="toolbar-button" type="button" @click="showHistory = !showHistory">
           History
+        </button>
+        <button
+          v-if="canReview"
+          :disabled="!store.document"
+          class="toolbar-button"
+          title="Claude suggests wording and structure changes, in the style of the Laravel docs"
+          type="button"
+          @click="reviews.open ? (reviews.open = false) : reviews.openPanel()">
+          AI review
         </button>
         <button :disabled="!store.document" class="toolbar-button" type="button" @click="openPreview">
           Print preview
@@ -185,6 +210,7 @@ onBeforeRouteLeave(() => store.flushAll())
         <PropertiesPanel @outline="showOutline = true" />
       </aside>
       <HistoryDrawer v-if="showHistory" @close="showHistory = false" />
+      <ProseReviewPanel v-if="canReview && reviews.open" @close="reviews.open = false" />
     </main>
 
     <PreviewModal

@@ -1,0 +1,180 @@
+import { errorMessage, http } from '@/builder/api.js'
+import { listenToReviews } from '@/builder/realtime.js'
+import { defineStore } from 'pinia'
+
+import { ref } from 'vue'
+
+import { useEditorStore } from './editor.js'
+
+const POLL_MS = 3000
+const SLOW_AFTER_MS = 30_000
+
+/**
+ * AI prose review of the open document (admins only): start one, follow it, and accept or dismiss what it
+ * suggests. Accepted changes are made by the server and handed to the editor store, which shows them and
+ * makes them undoable like any other edit.
+ */
+export const useProseReviewStore = defineStore('proseReview', () => {
+  const open = ref(false)
+  // block to review next (a topic), or null for the whole document
+  const scopeId = ref(null)
+  const review = ref(null)
+  const suggestions = ref([])
+  const starting = ref(false)
+  // queued for a while: the review worker may not be running
+  const slow = ref(false)
+  const error = ref(null)
+  const notice = ref(null)
+  const busy = ref(new Set())
+
+  let documentId = null
+  let pollTimer = null
+  let stopListening = null
+
+  function openPanel({ scope = null } = {}) {
+    scopeId.value = scope
+    open.value = true
+  }
+
+  /** Shows the latest review of the document (if any) and follows its progress. */
+  async function load(document) {
+    if (documentId === document.id) return
+    reset()
+    documentId = document.id
+    stopListening = listenToReviews(document.id, ({ review: updated }) => {
+      if (updated.id === review.value?.id) refresh()
+    })
+
+    try {
+      const { data } = await http.get(`/api/documents/${document.slug}/reviews`)
+      if (data.reviews[0]) {
+        review.value = data.reviews[0]
+        await refresh()
+      }
+    } catch (e) {
+      error.value = errorMessage(e)
+    }
+  }
+
+  /** options: { blockId?, kinds, model } */
+  async function start(slug, options) {
+    starting.value = true
+    error.value = null
+    try {
+      await useEditorStore().flushAll()
+      const { data } = await http.post(`/api/documents/${slug}/reviews`, options)
+      review.value = data.review
+      suggestions.value = []
+      await refresh()
+    } catch (e) {
+      error.value = errorMessage(e)
+    } finally {
+      starting.value = false
+    }
+  }
+
+  async function refresh() {
+    clearTimeout(pollTimer)
+    if (!review.value) return
+
+    const { data } = await http.get(`/api/reviews/${review.value.id}`)
+    review.value = data.review
+    suggestions.value = data.suggestions
+
+    const waiting = ['queued', 'running'].includes(data.review.status)
+    slow.value = data.review.status === 'queued' && Date.now() - new Date(data.review.createdAt) > SLOW_AFTER_MS
+    if (waiting) pollTimer = setTimeout(() => refresh().catch(report), POLL_MS)
+  }
+
+  async function accept(suggestion) {
+    await act(suggestion, async () => {
+      const editor = useEditorStore()
+      await editor.flushAll()
+      const { data } = await http.post(`/api/suggestions/${suggestion.id}/accept`)
+      editor.applyChange(data.change)
+      update(data.suggestion)
+      // a restructure removes blocks other suggestions pointed at; the server marked those stale
+      if (suggestion.kind === 'restructure') await refresh()
+    })
+  }
+
+  async function dismiss(suggestion) {
+    await act(suggestion, async () => {
+      const { data } = await http.post(`/api/suggestions/${suggestion.id}/dismiss`)
+      update(data.suggestion)
+    })
+  }
+
+  /** Accepts every pending wording suggestion for one rule. */
+  async function acceptRule(rule) {
+    error.value = notice.value = null
+    try {
+      const editor = useEditorStore()
+      await editor.flushAll()
+      const { data } = await http.post(`/api/reviews/${review.value.id}/accept-rule`, { rule })
+      data.changes.forEach(editor.applyChange)
+      suggestions.value = data.suggestions
+      const skipped = [
+        data.stale && `${data.stale} no longer matched the text`,
+        data.locked && `${data.locked} were on blocks someone is editing`,
+      ].filter(Boolean)
+      notice.value = `Accepted ${data.accepted}${skipped.length ? `; skipped ${skipped.join(' and ')}` : ''}.`
+    } catch (e) {
+      error.value = errorMessage(e)
+    }
+  }
+
+  async function act(suggestion, task) {
+    error.value = null
+    busy.value = new Set([...busy.value, suggestion.id])
+    try {
+      await task()
+    } catch (e) {
+      // stale (409): the server says what the suggestion is now
+      if (e.response?.data?.suggestion) update(e.response.data.suggestion)
+      error.value = errorMessage(e)
+    } finally {
+      busy.value = new Set([...busy.value].filter((id) => id !== suggestion.id))
+    }
+  }
+
+  function update(changed) {
+    suggestions.value = suggestions.value.map((suggestion) => (suggestion.id === changed.id ? changed : suggestion))
+  }
+
+  function report(e) {
+    error.value = errorMessage(e)
+  }
+
+  function reset() {
+    clearTimeout(pollTimer)
+    stopListening?.()
+    stopListening = null
+    documentId = null
+    review.value = null
+    suggestions.value = []
+    slow.value = false
+    error.value = notice.value = null
+    busy.value = new Set()
+  }
+
+  return {
+    open,
+    scopeId,
+    review,
+    suggestions,
+    starting,
+    slow,
+    error,
+    notice,
+    busy,
+    openPanel,
+    load,
+    start,
+    refresh,
+    accept,
+    dismiss,
+    acceptRule,
+    reset,
+  }
+})

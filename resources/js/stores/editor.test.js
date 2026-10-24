@@ -111,6 +111,20 @@ const server = vi.hoisted(() => {
 
         return { data: { seq: ++state.seq, blocks: ids.map((id) => node(state.blocks.get(id))) } }
       }
+      if (url.endsWith('/blocks/replace')) {
+        const stale = body.blocks.find(({ id: blockId, version }) => state.blocks.get(blockId).version !== version)
+        if (stale) return conflict(state.blocks.get(stale.id))
+
+        return {
+          data: {
+            seq: ++state.seq,
+            ...replace(
+              body.blocks.map((block) => block.id),
+              body.nodes
+            ),
+          },
+        }
+      }
       const id = url.split('/')[3]
       const block = state.blocks.get(id)
       const restore = (blockId) => {
@@ -163,7 +177,21 @@ const server = vi.hoisted(() => {
   const remote = (op, blockId, after, clientId = 'ana-tab') =>
     state.events.push({ seq: ++state.seq, op, blockId, userId: 2, clientId, before: null, after })
 
-  return { state, http, create, tree, remote }
+  /** Swaps neighbouring blocks for new ones in their place, as DocumentEditor::replaceBlocks does. */
+  const replace = (ids, nodes) => {
+    const first = state.blocks.get(ids[0])
+    const before = ids.map((blockId) => node(state.blocks.get(blockId)))
+    const markDeleted = (blockId) => {
+      state.deleted.add(blockId)
+      ;[...state.blocks.values()].filter((b) => b.parentId === blockId).forEach((b) => markDeleted(b.id))
+    }
+    ids.forEach(markDeleted)
+    const created = nodes.map((nodeData, i) => create(first.parentId, `${first.position}A${i}`, nodeData))
+
+    return { removed: ids, blocks: created.map((blockId) => node(state.blocks.get(blockId))), before }
+  }
+
+  return { state, http, create, tree, remote, replace }
 })
 
 const channel = vi.hoisted(() => ({ handlers: null, leave: vi.fn() }))
@@ -280,6 +308,69 @@ describe('editor store', () => {
     expect(store.get('b1').props.title).toBe('Changed elsewhere')
     expect(store.get('b1').version).toBe(2)
     expect(store.notice.type).toBe('warning')
+  })
+
+  describe('changes accepted from AI suggestions', () => {
+    it('shows an accepted text change, and undo and redo save it back and forth', async () => {
+      const before = structuredClone(server.state.blocks.get('b1'))
+      Object.assign(server.state.blocks.get('b1'), { props: { title: 'OVERVIEW OF IT' }, version: 2 })
+      store.applyChange({
+        seq: ++server.state.seq,
+        op: 'block.update',
+        blockId: 'b1',
+        before,
+        after: structuredClone(server.state.blocks.get('b1')),
+      })
+      expect(store.get('b1').props.title).toBe('OVERVIEW OF IT')
+
+      await store.undo()
+      expect(server.state.blocks.get('b1').props.title).toBe('OVERVIEW')
+
+      await store.redo()
+      expect(server.state.blocks.get('b1').props.title).toBe('OVERVIEW OF IT')
+    })
+
+    it('shows an accepted restructure, and undo and redo swap the blocks back and forth', async () => {
+      const { removed, blocks, before } = server.replace(
+        ['b3'],
+        [
+          { type: 'SecondaryTopic', props: { title: 'Servers' } },
+          { type: 'SecondaryTopic', props: { title: 'Network' } },
+        ]
+      )
+      store.applyChange({
+        seq: ++server.state.seq,
+        op: 'block.replace',
+        blockId: 'b3',
+        before: { blocks: before },
+        after: { removed, blocks },
+      })
+
+      expect(titles(store.get('b2').children)).toEqual(['Servers', 'Network'])
+      expect(store.selectedId).toBe(blocks[0].id)
+
+      await store.undo()
+      expect(titles(store.get('b2').children)).toEqual(['Infrastructure'])
+      const swap = server.state.calls.filter(([, url]) => url.endsWith('/blocks/replace')).at(-1)[2]
+      expect(swap.blocks).toEqual(blocks.map((block) => ({ id: block.id, version: 1 })))
+      // templates, not the old blocks themselves
+      expect(swap.nodes).toEqual([
+        { type: 'SecondaryTopic', props: { title: 'Infrastructure' }, options: {}, children: [] },
+      ])
+
+      await store.redo()
+      expect(titles(store.get('b2').children)).toEqual(['Servers', 'Network'])
+    })
+
+    it("applies someone else's restructure", async () => {
+      const { removed, blocks } = server.replace(['b1'], [{ type: 'PrimaryTopic', props: { title: 'INTRODUCTION' } }])
+      server.remote('block.replace', 'b1', { removed, blocks })
+
+      channel.handlers.changed({ seq: server.state.seq, clientId: 'ana-tab' })
+      await store.sync()
+
+      expect(titles(store.roots)).toEqual(['INTRODUCTION', 'SET-UP'])
+    })
   })
 
   it('folds everything below the top level on load and reveals a selection', () => {

@@ -1,7 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 
+import { useAuthStore } from '@/stores/auth.js'
 import { reported, useEditorStore } from '@/stores/editor.js'
+import { useProseReviewStore } from '@/stores/proseReview.js'
 
 import { OPTION_FIELDS, blockEditing, blockLabel, newBlock, toTemplate } from '../editing.js'
 import { allowedChildren, registry } from '../registry.js'
@@ -14,6 +16,9 @@ import UserBadge from './UserBadge.vue'
 const emit = defineEmits(['outline'])
 
 const store = useEditorStore()
+const reviews = useProseReviewStore()
+const auth = useAuthStore()
+const canReview = computed(() => !!auth.user?.abilities?.aiReview)
 
 const node = computed(() => store.selected)
 const definition = computed(() => node.value && registry[node.value.type])
@@ -94,6 +99,13 @@ function countBlocks(nodes) {
           type="button"
           @click="emit('outline')">
           Paste outline…
+        </button>
+        <button
+          v-if="definition.topic && canReview"
+          class="toolbar-button"
+          type="button"
+          @click="reviews.openPanel({ scope: node.id })">
+          AI review this section…
         </button>
       </div>
       <div class="flex flex-wrap gap-1.5">

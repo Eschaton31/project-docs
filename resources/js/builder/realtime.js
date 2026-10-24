@@ -63,3 +63,16 @@ export function joinDocument(documentId, handlers) {
     echo.leave(name)
   }
 }
+
+/**
+ * Listens for AI prose review progress on a document (admins only; the server refuses anyone else).
+ *
+ * @returns {() => void} stop
+ */
+export function listenToReviews(documentId, onUpdate) {
+  const name = `document.${documentId}.reviews`
+  const echo = connection()
+  echo.private(name).listen('.review.updated', onUpdate)
+
+  return () => echo.leave(name)
+}

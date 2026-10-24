@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import aiBlocks from './ai-blocks.json'
 import {
   blockEditing,
   conceptsToText,
@@ -12,7 +13,6 @@ import {
   textToTree,
   treeToText,
 } from './editing.js'
-import aiBlocks from './ai-blocks.json'
 import { canContain, registry } from './registry.js'
 
 describe('ai-blocks.json', () => {

@@ -4,7 +4,10 @@
   "TertiaryTopic": { "props": ["title"], "shape": "{\"title\": \"Title Case\"}" },
   "QuaternaryTopic": { "props": ["title"], "shape": "{\"title\": \"Title Case\"}" },
   "Paragraph": { "props": ["indent"], "shape": "{} (its text goes in RichText children)" },
-  "RichText": { "props": ["html"], "shape": "{\"html\": \"Inline HTML: <b>, <i>, <u>, <codetext>, <a class=\\\"text-link\\\" href>, <br>\"}" },
+  "RichText": {
+    "props": ["html"],
+    "shape": "{\"html\": \"Inline HTML: <b>, <i>, <u>, <codetext>, <a class=\\\"text-link\\\" href>, <br>\"}"
+  },
   "TertiaryTitle": { "props": ["text"], "shape": "{\"text\": \"Small heading\"}" },
   "Alert": {
     "props": ["type", "title"],

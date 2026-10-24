@@ -149,6 +149,18 @@ class ProseReviewApiTest extends TestCase
         $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertNotFound();
     }
 
+    public function test_the_user_payload_says_whether_to_offer_reviews(): void
+    {
+        $this->getJson('/api/user')->assertJsonPath('abilities.aiReview', true);
+
+        config(['ai-review.enabled' => false]);
+        $this->getJson('/api/user')->assertJsonPath('abilities.aiReview', false);
+
+        config(['ai-review.enabled' => true]);
+        $this->actingAs(User::factory()->create());
+        $this->getJson('/api/user')->assertJsonPath('abilities.aiReview', false);
+    }
+
     public function test_only_admins_may_join_a_documents_review_channel(): void
     {
         config([

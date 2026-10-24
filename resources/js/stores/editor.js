@@ -1,4 +1,5 @@
 import { clientId, http } from '@/builder/api.js'
+import { toTemplate } from '@/builder/editing.js'
 import { joinDocument } from '@/builder/realtime.js'
 import { defineStore } from 'pinia'
 
@@ -400,7 +401,64 @@ export const useEditorStore = defineStore('editor', () => {
       undoing ? await restore(entry.id) : await remove(entry.id, { recordUndo: false })
     } else if (entry.kind === 'move') {
       await move(entry.id, undoing ? entry.from : entry.to, { recordUndo: false })
+    } else if (entry.kind === 'replace') {
+      // each swap makes new blocks, so the entry follows whichever ones are in the document now
+      entry.ids = await replaceBlocks(entry.ids, undoing ? entry.before : entry.after)
     }
+  }
+
+  // ── changes the server made for this tab (accepted AI suggestions) ─────────
+
+  /**
+   * Applies a change made on this tab's behalf and makes it undoable. The tab skips its own live events,
+   * so the change comes in the response instead: a block.update or block.replace revision event.
+   */
+  function applyChange(event) {
+    if (event.op === 'block.update') {
+      applyEvent(event)
+      record({
+        kind: 'update',
+        id: event.blockId,
+        before: snapshot(event.before),
+        after: snapshot(event.after),
+        version: event.after.version,
+      })
+    } else if (event.op === 'block.replace') {
+      showReplacement(event.after)
+      record({
+        kind: 'replace',
+        ids: event.after.blocks.map((block) => block.id),
+        before: event.before.blocks.map(toTemplate),
+        after: event.after.blocks.map(toTemplate),
+      })
+    }
+  }
+
+  /** Swaps neighbouring blocks for new nodes in one change; returns the new top-level ids. */
+  async function replaceBlocks(ids, nodes) {
+    await flushAll()
+    const blocks = ids.map((id) => {
+      const node = get(id)
+      if (!node) throw new Error('those blocks no longer exist.')
+
+      return { id, version: node.version }
+    })
+    const { data } = await request(http.post(`/api/documents/${document.value.slug}/blocks/replace`, { blocks, nodes }))
+    showReplacement(data)
+
+    return data.blocks.map((block) => block.id)
+  }
+
+  function showReplacement(after) {
+    swapIn(after)
+    reindex()
+    select(after.blocks[0]?.id ?? null)
+  }
+
+  /** { removed: ids, blocks: new subtrees } from a block.replace revision. */
+  function swapIn({ removed, blocks }) {
+    removed.filter((id) => get(id)).forEach(unplace)
+    blocks.filter((block) => !get(block.id)).forEach((block) => place(block.parentId, block))
   }
 
   // ── locks ──────────────────────────────────────────────────────────────────
@@ -610,6 +668,8 @@ export const useEditorStore = defineStore('editor', () => {
       if (node) relocate(node, after)
     } else if (op === 'block.delete') {
       if (get(blockId)) unplace(blockId)
+    } else if (op === 'block.replace') {
+      swapIn(after)
     } else if (op === 'document.update') {
       if (!documentDirty.value) Object.assign(document.value, pickSettings(after))
     }
@@ -716,6 +776,7 @@ export const useEditorStore = defineStore('editor', () => {
     flushDocument,
     undo,
     redo,
+    applyChange,
     lockOf,
     lockedByOther,
     subtreeLockedByOther,
