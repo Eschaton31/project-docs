@@ -28,6 +28,8 @@
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="AI_REVIEW_QUEUE_CONNECTION" value="sync"/>
+        <env name="ANTHROPIC_API_KEY" value="test-key-never-used"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

@@ -52,7 +52,7 @@
             "Composer\\Config::disableProcessTimeout",
             "npm run build",
             "@php -r \"@unlink('public/hot');\"",
-            "npx concurrently -c \"#c4b5fd,#fdba74\" \"php artisan queue:work\" \"php artisan reverb:start\" --names=queue,reverb --kill-others"
+            "npx concurrently -c \"#c4b5fd,#fdba74,#86efac\" \"php artisan queue:work\" \"php artisan reverb:start\" \"php artisan queue:work ai-review --queue=ai-review --tries=1 --timeout=1800\" --names=queue,reverb,ai-queue --kill-others"
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",

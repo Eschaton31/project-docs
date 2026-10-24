@@ -29,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
 
         if ($this->app->runningConsoleCommand('dev')) {
             $this->serveOnHostIp();
+            // AI prose reviews run on their own queue (config/queue.php "ai-review")
+            DevCommands::artisan('queue:listen ai-review --queue=ai-review --tries=1 --timeout=0', 'ai-queue');
         }
     }
 

@@ -44,6 +44,17 @@ return [
             'after_commit' => false,
         ],
 
+        // AI prose reviews: one job makes several model calls, far longer than the default retry_after,
+        // so they get their own queue and worker (see composer.json "prod" and AppServiceProvider)
+        'ai-review' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'ai-review',
+            'retry_after' => (int) env('AI_REVIEW_RETRY_AFTER', 1900),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

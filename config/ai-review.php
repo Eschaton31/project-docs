@@ -16,8 +16,12 @@ return [
     'max_chars_per_chunk' => 24_000,
     'max_chars_per_review' => 200_000,
 
-    // Seconds per model call; the job's timeout is derived from it.
+    // Seconds per model call; the job's timeout is derived from it and must stay under the
+    // ai-review queue connection's retry_after.
     'timeout' => 180,
+
+    // 'ai-review' in every environment but tests (phpunit.xml sets sync).
+    'queue_connection' => env('AI_REVIEW_QUEUE_CONNECTION', 'ai-review'),
 
     // Reviews each admin may start per hour.
     'rate_limit_per_hour' => 10,
