@@ -53,4 +53,9 @@ describe('plainText', () => {
   it('drops tags and decodes entities', () => {
     expect(plainText('Run <codetext>a &amp; b</codetext>&nbsp;now<br>')).toBe('Run a & b now')
   })
+
+  it('reads anything but a string as empty', () => {
+    expect(plainText(null)).toBe('')
+    expect(plainText({ id: 1 })).toBe('')
+  })
 })

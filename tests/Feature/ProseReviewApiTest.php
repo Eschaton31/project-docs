@@ -54,6 +54,7 @@ class ProseReviewApiTest extends TestCase
         $this->getJson("/api/reviews/{$review['id']}")
             ->assertOk()
             ->assertJsonPath('review.status', 'done')
+            ->assertJsonPath('suggestions.0.original', 'In order to install it')
             ->assertJsonPath('suggestions.0.suggested', 'To install it')
             ->assertJsonPath('suggestions.0.status', 'pending');
         $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('reviews.0.id', $review['id']);

@@ -37,7 +37,8 @@ export function wordDiff(before, after) {
 export function plainText(html) {
   const entities = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' }
 
-  return (html ?? '')
+  // anything but a string (a bad payload) reads as empty rather than breaking the whole panel
+  return (typeof html === 'string' ? html : '')
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]*>/g, '')
     .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, name) => entities[name])

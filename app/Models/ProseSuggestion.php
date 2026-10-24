@@ -54,7 +54,8 @@ class ProseSuggestion extends Model
             'blockIds' => $this->block_ids,
             'field' => $this->field,
             'path' => $this->path,
-            'original' => $this->original,
+            // not $this->original: inside the model that is Eloquent's own $original property (all attributes)
+            'original' => $this->getAttribute('original'),
             'suggested' => $this->suggested,
             'replacement' => $this->replacement,
             'parentId' => $this->parent_id,
