@@ -298,6 +298,23 @@ signed in as the worker's account. No tools, settings, hooks, MCP servers or CLA
 text is editor-written. Other admins see the `/prose-review` command instead. `php artisan prose-review:check-claude`
 confirms the worker's account can run Claude Code.
 
+## Expanding sections (added after the plan)
+
+A third kind, `expand` (opt-in: the **Expand** checkbox, `--kinds=…,expand`), adds content where a section is
+thin: a missing introduction, something named but not explained, a missing example, missing prerequisites or
+next steps (rules `introduction`, `depth`, `example`, `context`).
+
+- **Insert only.** An expansion is `anchor` + `position` (`before`/`after` the block, or `start`/`end` inside it)
+  + new nodes, applied with `DocumentEditor::insertTree` as one `block.insert` revision. Nothing that's already
+  there is replaced, so blocks keep their ids, other suggestions on them still apply, and undo is the editor's
+  ordinary insert undo. It only goes stale when the anchor is deleted or moved to another parent.
+- **Brief.** The admin can give a brief (≤ 4000 chars, `prose_reviews.brief`), quoted in every chunk's prompt.
+  `/prose-review` takes it after `--brief:` and passes it to the export through a file (`--brief-file`), never on
+  a shell command line.
+- **Sources.** Each expansion lists where its content came from: `document`, `brief` and/or `general` (the
+  model's own knowledge, limited to widely known background, never product specifics). The panel marks
+  `general` ones **check facts**.
+
 ## Open items to confirm during Task 0
 
 - Exact laravel/ai agent, structured output and fake APIs (read the installed package).

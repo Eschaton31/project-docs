@@ -78,6 +78,20 @@ class ReviewPromptTest extends TestCase
 
         $this->assertStringContainsString('Suggestion kinds requested: text', $prompt);
         $this->assertStringContainsString('Return an empty "restructure" list', $prompt);
+        $this->assertStringContainsString('Return an empty "expand" list', $prompt);
+        $this->assertStringNotContainsString('## Brief', $prompt);
+    }
+
+    public function test_the_prompt_carries_the_brief_when_there_is_one(): void
+    {
+        $snapshot = $this->snapshot([$this->text('Hello.')]);
+
+        $prompt = ReviewPrompt::render($snapshot, ['B1', 'B2'], ['expand'], "  Explain retries: 3 tries, 30s apart.\n");
+
+        $this->assertStringContainsString('Suggestion kinds requested: expand', $prompt);
+        $this->assertStringContainsString("## Brief\n", $prompt);
+        $this->assertStringContainsString('«Explain retries: 3 tries, 30s apart.»', $prompt);
+        $this->assertStringNotContainsString('Return an empty "expand" list', $prompt);
     }
 
     private function snapshot(array $nodes): ProseSnapshot

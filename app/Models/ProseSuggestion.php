@@ -6,12 +6,23 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['review_id', 'kind', 'severity', 'rule', 'rationale', 'block_ids', 'block_versions', 'field', 'path', 'original', 'suggested', 'replacement', 'parent_id', 'status', 'resolved_by', 'resolved_at'])]
+#[Fillable(['review_id', 'kind', 'severity', 'rule', 'rationale', 'block_ids', 'block_versions', 'field', 'path', 'original', 'suggested', 'replacement', 'parent_id', 'position', 'sources', 'status', 'resolved_by', 'resolved_at'])]
 class ProseSuggestion extends Model
 {
     public const TEXT = 'text';
 
     public const RESTRUCTURE = 'restructure';
+
+    // adds new blocks next to or inside an existing one; nothing already there changes
+    public const EXPAND = 'expand';
+
+    public const KINDS = [self::TEXT, self::RESTRUCTURE, self::EXPAND];
+
+    // where an expansion goes, relative to its block: a sibling before/after it, or its first/last child
+    public const POSITIONS = ['before', 'after', 'start', 'end'];
+
+    // where an expansion's content came from; "general" (the model's own knowledge) needs a fact check
+    public const SOURCES = ['document', 'brief', 'general'];
 
     public const PENDING = 'pending';
 
@@ -28,6 +39,7 @@ class ProseSuggestion extends Model
             'block_ids' => 'array',
             'block_versions' => 'array',
             'replacement' => 'array',
+            'sources' => 'array',
             'resolved_at' => 'datetime',
         ];
     }
@@ -59,6 +71,8 @@ class ProseSuggestion extends Model
             'suggested' => $this->suggested,
             'replacement' => $this->replacement,
             'parentId' => $this->parent_id,
+            'position' => $this->position,
+            'sources' => $this->sources,
             'status' => $this->status,
             'resolvedBy' => $this->resolved_by,
             'resolvedAt' => $this->resolved_at?->toIso8601String(),

@@ -146,6 +146,54 @@ class SuggestionValidatorTest extends TestCase
         $this->assertSame([], $this->validate(restructure: [$this->restructure(['B2'], $replacement)], kinds: ['text']));
     }
 
+    public function test_an_expansion_inserts_new_blocks_next_to_its_anchor(): void
+    {
+        $paragraph = ['type' => 'Paragraph', 'props' => [], 'children' => [['type' => 'RichText', 'props' => ['html' => 'Composer is PHP\'s package manager.']]]];
+
+        [$saved] = $this->validate(expand: [$this->expand('B4', 'after', [$paragraph], ['general', 'document'])]);
+
+        $this->assertSame(ProseSuggestion::EXPAND, $saved['kind']);
+        $this->assertSame([$this->id('B4')], $saved['block_ids']);
+        $this->assertSame([$this->id('B4') => 1], $saved['block_versions']);
+        $this->assertSame([$this->id('B1'), 'after'], [$saved['parent_id'], $saved['position']]);
+        $this->assertSame(['general', 'document'], $saved['sources']);
+        $this->assertSame('Composer is PHP\'s package manager.', $saved['replacement'][0]['children'][0]['props']['html']);
+    }
+
+    public function test_an_expansion_can_go_inside_its_anchor(): void
+    {
+        $intro = ['type' => 'Paragraph', 'children' => [['type' => 'RichText', 'props' => ['html' => 'This section covers the setup.']]]];
+
+        [$saved] = $this->validate(expand: [$this->expand('B1', 'start', [$intro])]);
+
+        $this->assertSame([$this->id('B1'), 'start'], [$saved['parent_id'], $saved['position']]);
+    }
+
+    public function test_expansions_are_dropped_when_they_cannot_be_inserted_safely(): void
+    {
+        $paragraph = ['type' => 'Paragraph', 'children' => [['type' => 'RichText', 'props' => ['html' => 'More.']]]];
+        $cases = [
+            'unknown block' => $this->expand('B99', 'after', [$paragraph]),
+            'block outside the chunk' => $this->expand('B8', 'after', [$paragraph]),
+            'unknown position' => $this->expand('B2', 'below', [$paragraph]),
+            'no sources' => $this->expand('B2', 'after', [$paragraph], []),
+            'unknown source' => $this->expand('B2', 'after', [$paragraph], ['hunch']),
+            'invalid JSON' => $this->expand('B2', 'after', '[{'),
+            'empty' => $this->expand('B2', 'after', []),
+            'keeps an existing block' => $this->expand('B2', 'after', [['keep' => 'B4']]),
+            'type that cannot be created' => $this->expand('B2', 'after', [['type' => 'SqlTable', 'props' => ['data' => []]]]),
+            'breaks nesting' => $this->expand('B2', 'after', [['type' => 'PrimaryTopic', 'props' => ['title' => 'X']]]),
+            'paragraph inside a paragraph' => $this->expand('B2', 'end', [$paragraph]),
+            'html not allowed' => $this->expand('B2', 'after', [['type' => 'Paragraph', 'children' => [['type' => 'RichText', 'props' => ['html' => '<img src=x>']]]]]),
+        ];
+        $this->chunk = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'];
+
+        foreach ($cases as $case => $suggestion) {
+            $this->assertSame([], $this->validate(expand: [$suggestion]), $case);
+        }
+        $this->assertSame([], $this->validate(expand: [$this->expand('B2', 'after', [$paragraph])], kinds: ['text', 'restructure']), 'not requested');
+    }
+
     public function test_it_counts_why_suggestions_were_dropped(): void
     {
         $validator = new SuggestionValidator($this->snapshot, $this->chunk, ['text', 'restructure']);
@@ -154,9 +202,19 @@ class SuggestionValidatorTest extends TestCase
         $this->assertSame(['unknown segment' => 1, 'original not found once in the segment' => 1], $validator->dropped());
     }
 
-    private function validate(array $text = [], array $restructure = [], array $kinds = ['text', 'restructure']): array
+    private function validate(array $text = [], array $restructure = [], array $expand = [], array $kinds = ProseSuggestion::KINDS): array
     {
-        return (new SuggestionValidator($this->snapshot, $this->chunk, $kinds))->validate(['text' => $text, 'restructure' => $restructure]);
+        return (new SuggestionValidator($this->snapshot, $this->chunk, $kinds))->validate(['text' => $text, 'restructure' => $restructure, 'expand' => $expand]);
+    }
+
+    private function expand(string $anchor, string $position, array|string $blocks, array $sources = ['document']): array
+    {
+        return [
+            'anchor' => $anchor, 'position' => $position,
+            'blocks_json' => is_string($blocks) ? $blocks : json_encode($blocks),
+            'sources' => $sources,
+            'rule' => 'depth', 'rationale' => 'Composer is used but never explained.', 'severity' => 'minor',
+        ];
     }
 
     private function text(string $segment, string $original, string $suggested): array

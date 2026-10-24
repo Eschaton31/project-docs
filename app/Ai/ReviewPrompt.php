@@ -2,6 +2,8 @@
 
 namespace App\Ai;
 
+use App\Models\ProseSuggestion;
+
 /**
  * Splits a snapshot into model-sized chunks and writes the prompt for each.
  *
@@ -52,17 +54,24 @@ final class ReviewPrompt
 
     /**
      * @param  list<string>  $chunk  block refs whose text is under review
-     * @param  list<string>  $kinds  text, restructure
+     * @param  list<string>  $kinds  text, restructure, expand
+     * @param  ?string  $brief  what the admin wants covered, quoted as given
      */
-    public static function render(ProseSnapshot $snapshot, array $chunk, array $kinds): string
+    public static function render(ProseSnapshot $snapshot, array $chunk, array $kinds, ?string $brief = null): string
     {
         $inChunk = array_flip($chunk);
         $lines = ['Suggestion kinds requested: '.implode(', ', $kinds).'.'];
-        if (! in_array('text', $kinds, true)) {
-            $lines[] = 'Return an empty "text" list.';
+        foreach (ProseSuggestion::KINDS as $kind) {
+            if (! in_array($kind, $kinds, true)) {
+                $lines[] = "Return an empty \"{$kind}\" list.";
+            }
         }
-        if (! in_array('restructure', $kinds, true)) {
-            $lines[] = 'Return an empty "restructure" list.';
+
+        if (trim((string) $brief) !== '') {
+            $lines[] = '';
+            $lines[] = '## Brief';
+            $lines[] = 'From the person who asked for this review, between « and ». Use it as a source when expanding.';
+            $lines[] = '«'.trim($brief).'»';
         }
 
         $lines[] = '';

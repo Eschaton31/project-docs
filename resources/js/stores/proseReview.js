@@ -75,7 +75,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     }
   }
 
-  /** options: { blockId?, kinds, model } */
+  /** options: { blockId?, kinds, model, brief? } */
   async function start(slug, options) {
     starting.value = true
     error.value = null

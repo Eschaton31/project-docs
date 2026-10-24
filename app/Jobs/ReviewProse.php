@@ -44,7 +44,7 @@ class ReviewProse implements ShouldQueue
         $dropped = [];
 
         foreach ($chunks as $chunk) {
-            $answer = $reviewer->review(ReviewPrompt::render($snapshot, $chunk, $review->kinds), $review->model);
+            $answer = $reviewer->review(ReviewPrompt::render($snapshot, $chunk, $review->kinds, $review->brief), $review->model);
 
             $dropped = ReviewRun::addDropped($dropped, ReviewRun::save($review, $snapshot, $chunk, $answer['output']));
             $usage['input_tokens'] += $answer['usage']['input_tokens'];

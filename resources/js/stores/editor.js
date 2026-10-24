@@ -435,6 +435,9 @@ export const useEditorStore = defineStore('editor', () => {
         after: snapshot(event.after),
         version: event.after.version,
       })
+    } else if (event.op === 'block.insert') {
+      applyEvent(event)
+      record({ kind: 'insert', ids: event.after.blocks.map((block) => block.id) })
     } else if (event.op === 'block.replace') {
       showReplacement(event.after)
       record({

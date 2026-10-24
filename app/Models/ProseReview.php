@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['document_id', 'scope_block_id', 'requested_by', 'model', 'kinds', 'status', 'error', 'document_seq', 'snapshot', 'input_tokens', 'output_tokens'])]
+#[Fillable(['document_id', 'scope_block_id', 'requested_by', 'model', 'kinds', 'brief', 'status', 'error', 'document_seq', 'snapshot', 'input_tokens', 'output_tokens'])]
 #[Hidden(['snapshot'])]
 class ProseReview extends Model
 {
@@ -25,6 +25,9 @@ class ProseReview extends Model
 
     // the model column of reviews run in Claude Code (with the user's own Claude plan)
     public const CLAUDE_CODE = 'claude-code';
+
+    // characters an admin's brief may have
+    public const MAX_BRIEF = 4000;
 
     protected function casts(): array
     {
@@ -60,6 +63,7 @@ class ProseReview extends Model
             'scopeBlockId' => $this->scope_block_id,
             'model' => $this->model,
             'kinds' => $this->kinds,
+            'brief' => $this->brief,
             'error' => $this->error,
             'documentSeq' => $this->document_seq,
             'usage' => ['inputTokens' => $this->input_tokens, 'outputTokens' => $this->output_tokens],

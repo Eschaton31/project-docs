@@ -60,6 +60,39 @@ class ProseReviewApiTest extends TestCase
         $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('reviews.0.id', $review['id']);
     }
 
+    public function test_an_expansion_review_sends_the_brief_and_marks_where_content_came_from(): void
+    {
+        ProseReviewer::fake([['text' => [], 'restructure' => [], 'expand' => [[
+            'anchor' => 'B1', 'position' => 'start', 'sources' => ['brief', 'general'],
+            'blocks_json' => json_encode([['type' => 'Paragraph', 'children' => [['type' => 'RichText', 'props' => ['html' => 'You need PHP 8.4 or later.']]]]]),
+            'rule' => 'introduction', 'rationale' => 'The section has no introduction.', 'severity' => 'minor',
+        ]]]]);
+
+        $review = $this->postJson("/api/documents/{$this->document->slug}/reviews", ['kinds' => ['expand'], 'brief' => ' We need PHP 8.4. '])
+            ->assertAccepted()
+            ->assertJsonPath('review.kinds', ['expand'])
+            ->assertJsonPath('review.brief', 'We need PHP 8.4.')
+            ->json('review');
+
+        ProseReviewer::assertPrompted(fn ($prompt) => $prompt->contains('«We need PHP 8.4.»'));
+        $suggestion = $this->getJson("/api/reviews/{$review['id']}")
+            ->assertJsonPath('suggestions.0.kind', 'expand')
+            ->assertJsonPath('suggestions.0.position', 'start')
+            ->assertJsonPath('suggestions.0.sources', ['brief', 'general'])
+            ->json('suggestions.0');
+
+        $this->postJson("/api/suggestions/{$suggestion['id']}/accept")
+            ->assertOk()
+            ->assertJsonPath('change.op', 'block.insert')
+            ->assertJsonPath('change.after.blocks.0.children.0.props.html', 'You need PHP 8.4 or later.');
+    }
+
+    public function test_the_brief_has_a_limit(): void
+    {
+        $this->postJson("/api/documents/{$this->document->slug}/reviews", ['kinds' => ['expand'], 'brief' => str_repeat('a', ProseReview::MAX_BRIEF + 1)])
+            ->assertJsonValidationErrors('brief');
+    }
+
     public function test_accepting_returns_the_change_for_the_tab_to_apply(): void
     {
         $suggestion = $this->suggestion();

@@ -1,7 +1,7 @@
 ---
 name: prose-review
-description: Run an AI prose review of a project-docs document in this Claude Code session (with the user's own Claude plan), in the style of the Laravel docs, and import the suggestions for admins to accept in the editor. Use when the user asks to review, proofread or restructure a document's prose, or runs /prose-review <document-slug>.
-argument-hint: <document-slug> [--block=<topic-block-id>] [--kinds=text|restructure|text,restructure]
+description: Run an AI prose review of a project-docs document in this Claude Code session (with the user's own Claude plan), in the style of the Laravel docs, and import the suggestions for admins to accept in the editor. Use when the user asks to review, proofread, restructure, expand or flesh out a document's prose or sections, or runs /prose-review <document-slug>.
+argument-hint: <document-slug> [--block=<topic-block-id>] [--kinds=text,restructure,expand] [--brief: <what to cover>]
 ---
 
 # Prose review in Claude Code
@@ -17,9 +17,16 @@ Arguments: `$ARGUMENTS`
 Run, passing the arguments through:
 
 ```
-php artisan prose-review:export <document-slug> [--block=<id>] [--kinds=...]
+php artisan prose-review:export <document-slug> [--block=<id>] [--kinds=...] [--brief-file=<path>]
 ```
 
+- `--kinds` is any of `text` (wording), `restructure` (block structure) and `expand` (add missing content),
+  comma separated; without it, text and restructure.
+- **Brief.** Everything after `--brief:` in the arguments is the admin's brief: what to cover when expanding, and
+  facts the reviewer may use. Never put it in a shell command. Write it, word for word, to
+  `storage/app/prose-reviews/brief.txt` with your file-writing tool and pass `--brief-file=storage/app/prose-reviews/brief.txt`.
+  If the user asks to expand or flesh out sections and mentions what to add, that is the brief too. Add `expand`
+  to `--kinds` when there is a brief.
 - No slug given, or it isn't found: list documents with
   `php artisan tinker --execute="dump(App\Models\Document::pluck('title', 'slug')->all())"` and ask which one.
 - `--block` reviews one topic (with everything inside it). The editor's AI review panel shows the exact command
@@ -30,11 +37,15 @@ It prints the review id, the folder, the instructions file and each chunk file w
 ## 2. Review
 
 1. Read `instructions.md` completely before anything else. It holds the style guide, the rules for text and
-   restructure suggestions, and the answer format. Follow it exactly; it is the same brief the API reviewer gets.
+   restructure and expand suggestions, and the answer format. Follow it exactly; it is the same brief the API
+   reviewer gets.
 2. For each `chunk-N.md`, read it and write your answer to the path it names (`chunk-N.json`): one JSON object
-   with `text` and `restructure` lists and nothing else.
+   with `text`, `restructure` and `expand` lists and nothing else.
    - Copy every `original` from the segment character for character, HTML included.
-   - `replacement_json` is a string containing JSON.
+   - `replacement_json` and `blocks_json` are strings containing JSON.
+   - Expansions draw only on the chunk files, the brief and general knowledge, as the instructions say. Don't
+     read the codebase or the web for them: the instructions' `sources` must be truthful, and the admin
+     fact-checks anything marked `general`.
    - Fewer, well-founded suggestions beat many marginal ones. Empty lists are a fine answer.
 3. With several chunks, you may hand each chunk to a subagent with the instructions file, as long as every
    answer file gets written.

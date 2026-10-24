@@ -193,6 +193,52 @@ class ProseSuggestionTest extends TestCase
         $this->assertSame(['Paragraph', 'BulletList', 'CodeBlock'], array_column($this->tree()[0]['children'], 'type'));
     }
 
+    public function test_accepting_an_expansion_inserts_blocks_and_leaves_the_rest_alone(): void
+    {
+        $other = $this->textSuggestion('In order to install it', 'To install it');
+        $suggestion = $this->expandSuggestion($this->ids['paragraph'], 'after', $this->ids['topic']);
+
+        $revision = $this->service()->accept($suggestion, $this->admin);
+
+        $this->assertSame('block.insert', $revision->op);
+        $children = $this->tree()[0]['children'];
+        $this->assertSame(['Paragraph', 'Paragraph', 'CodeBlock'], array_column($children, 'type'));
+        // the existing blocks are the same blocks, not copies
+        $this->assertSame([$this->ids['paragraph'], $this->ids['code']], [$children[0]['id'], $children[2]['id']]);
+        $this->assertSame('Composer installs the PHP packages.', $children[1]['children'][0]['props']['html']);
+        $this->assertSame(ProseSuggestion::ACCEPTED, $suggestion->fresh()->status);
+
+        // so suggestions on them still apply
+        $this->assertSame(ProseSuggestion::PENDING, $other->fresh()->status);
+        $this->service()->accept($other, $this->admin);
+        $this->assertSame('To install it, you need PHP, a database and Chrome.', $this->props('text')['html']);
+    }
+
+    public function test_an_expansion_can_open_a_section(): void
+    {
+        $this->service()->accept($this->expandSuggestion($this->ids['topic'], 'start', $this->ids['topic']), $this->admin);
+
+        $this->assertSame(['Paragraph', 'Paragraph', 'CodeBlock'], array_column($this->tree()[0]['children'], 'type'));
+        $this->assertSame('Composer installs the PHP packages.', $this->tree()[0]['children'][0]['children'][0]['props']['html']);
+    }
+
+    public function test_an_expansion_still_applies_after_edits_but_not_once_its_block_is_gone(): void
+    {
+        $this->patchJson("/api/blocks/{$this->ids['code']}", ['version' => 1, 'props' => ['lang' => 'bash', 'code' => 'composer install --no-dev']])->assertOk();
+        $this->service()->accept($this->expandSuggestion($this->ids['code'], 'before', $this->ids['topic']), $this->admin);
+        $this->assertSame(['Paragraph', 'Paragraph', 'CodeBlock'], array_column($this->tree()[0]['children'], 'type'));
+
+        $gone = $this->expandSuggestion($this->ids['paragraph'], 'after', $this->ids['topic']);
+        $this->deleteJson("/api/blocks/{$this->ids['paragraph']}", ['version' => 1])->assertSuccessful();
+
+        $this->expectException(SuggestionStaleException::class);
+        try {
+            $this->service()->accept($gone, $this->admin);
+        } finally {
+            $this->assertSame(ProseSuggestion::STALE, $gone->fresh()->status);
+        }
+    }
+
     public function test_the_replace_endpoint_refuses_blocks_that_are_not_neighbours(): void
     {
         $this->postJson("/api/documents/{$this->document->slug}/blocks/replace", [
@@ -226,6 +272,19 @@ class ProseSuggestionTest extends TestCase
             'replacement' => [
                 ['type' => 'Paragraph', 'props' => [], 'options' => [], 'children' => [['type' => 'RichText', 'props' => ['html' => 'To install it, you need:'], 'options' => [], 'children' => []]]],
                 ['type' => 'BulletList', 'props' => ['list' => ['PHP', 'A database', 'Chrome']], 'options' => [], 'children' => []],
+            ],
+            'status' => ProseSuggestion::PENDING,
+        ]);
+    }
+
+    private function expandSuggestion(string $anchor, string $position, ?string $parent): ProseSuggestion
+    {
+        return $this->review->suggestions()->create([
+            'kind' => ProseSuggestion::EXPAND, 'severity' => 'minor', 'rule' => 'depth', 'rationale' => 'Composer is never explained.',
+            'block_ids' => [$anchor], 'block_versions' => [$anchor => 1],
+            'parent_id' => $parent, 'position' => $position, 'sources' => ['general'],
+            'replacement' => [
+                ['type' => 'Paragraph', 'props' => [], 'options' => [], 'children' => [['type' => 'RichText', 'props' => ['html' => 'Composer installs the PHP packages.'], 'options' => [], 'children' => []]]],
             ],
             'status' => ProseSuggestion::PENDING,
         ]);

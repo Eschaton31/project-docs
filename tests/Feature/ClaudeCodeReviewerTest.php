@@ -49,7 +49,8 @@ class ClaudeCodeReviewerTest extends TestCase
                 && in_array('--strict-mcp-config', $command, true)
                 && in_array('--no-session-persistence', $command, true)
                 && $command[array_search('--model', $command) + 1] === 'opus'
-                && $schema['required'] === ['text', 'restructure']
+                && $schema['required'] === ['text', 'restructure', 'expand']
+                && $schema['properties']['expand']['items']['required'] === ['anchor', 'position', 'blocks_json', 'sources', 'rule', 'rationale', 'severity']
                 && str_contains(file_get_contents($instructions), 'Laravel documentation')
                 // an empty folder outside the project, so no CLAUDE.md or project settings apply
                 && ! str_starts_with(realpath($process->path), base_path())

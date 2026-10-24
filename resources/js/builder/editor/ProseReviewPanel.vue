@@ -12,7 +12,8 @@ import { plainText, wordDiff } from './proseDiff.js'
 
 /**
  * AI prose review (admins only): Claude checks the document, or one topic, against a style guide based on
- * the Laravel docs and suggests wording changes and better block structure. Nothing changes until a
+ * the Laravel docs and suggests wording changes, better block structure and (when asked) new content for thin
+ * sections. Nothing changes until a
  * suggestion is accepted, and accepted changes can be undone like any other edit.
  */
 const emit = defineEmits(['close'])
@@ -28,6 +29,9 @@ const MODELS = [
 const scope = ref(reviews.scopeId ?? 'document')
 const wording = ref(true)
 const structure = ref(true)
+// adds content rather than tidying what's there, so it's asked for explicitly
+const expand = ref(false)
+const brief = ref('')
 const model = ref('sonnet')
 const showAll = ref(false)
 const kind = ref('all')
@@ -52,7 +56,10 @@ const scopeChoices = computed(() => {
 })
 
 const running = computed(() => ['queued', 'running'].includes(reviews.review?.status))
-const kinds = computed(() => [wording.value && 'text', structure.value && 'restructure'].filter(Boolean))
+const kinds = computed(() =>
+  [wording.value && 'text', structure.value && 'restructure', expand.value && 'expand'].filter(Boolean)
+)
+const briefText = computed(() => (expand.value ? brief.value.trim() : ''))
 
 // this user can't start reviews here (with Claude Code, only the plan's owner can): show the command to run
 // in Claude Code instead
@@ -61,7 +68,10 @@ const command = computed(() =>
   [
     `/prose-review ${editor.document.slug}`,
     scope.value !== 'document' && `--block=${scope.value}`,
-    kinds.value.length === 1 && `--kinds=${kinds.value[0]}`,
+    // text and restructure are the command's default
+    kinds.value.join(',') !== 'text,restructure' && `--kinds=${kinds.value.join(',')}`,
+    // last, since everything after it is the brief; on one line so it pastes as one command
+    briefText.value && `--brief: ${briefText.value.replace(/\s+/g, ' ')}`,
   ]
     .filter(Boolean)
     .join(' ')
@@ -82,6 +92,7 @@ function startReview() {
     blockId: scope.value === 'document' ? null : scope.value,
     kinds: kinds.value,
     model: model.value,
+    brief: briefText.value || null,
   })
 }
 
@@ -154,6 +165,19 @@ function previewNodes(nodes, prefix = 'preview') {
 
 const STATUS = { accepted: 'Accepted', dismissed: 'Dismissed', stale: 'Text changed since the review' }
 
+/** Where an expansion goes, relative to the block it's grouped under. */
+const POSITIONS = {
+  before: 'Adds before this block',
+  after: 'Adds after this block',
+  start: 'Adds at the start of this section',
+  end: 'Adds at the end of this section',
+}
+
+const SOURCES = { document: 'from the document', brief: 'from your brief' }
+
+/** Expansions that lean on the model's own knowledge, which someone should check before accepting. */
+const needsFactCheck = (suggestion) => suggestion.sources?.includes('general')
+
 /** Hovering a suggestion marks its blocks in the canvas and outline, and for wording the phrase it changes. */
 function pointAt(suggestion) {
   editor.point(suggestion.blockIds, suggestion.kind === 'text' ? plainText(suggestion.original) : null)
@@ -201,6 +225,11 @@ onBeforeUnmount(() => {
       <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-700">
         <label class="flex items-center gap-1.5"><input v-model="wording" type="checkbox" /> Wording</label>
         <label class="flex items-center gap-1.5"><input v-model="structure" type="checkbox" /> Structure</label>
+        <label
+          class="flex items-center gap-1.5"
+          title="Add introductions, explanations and examples where a section is thin"
+          ><input v-model="expand" type="checkbox" /> Expand</label
+        >
         <template v-if="!inClaudeCode">
           <span class="mx-1 h-4 w-px bg-slate-200" />
           <label v-for="[value, label, hint] in MODELS" :key="value" :title="hint" class="flex items-center gap-1.5">
@@ -208,6 +237,13 @@ onBeforeUnmount(() => {
           </label>
         </template>
       </div>
+      <textarea
+        v-if="expand"
+        v-model="brief"
+        aria-label="Brief"
+        class="field-input min-h-16"
+        maxlength="4000"
+        placeholder="Optional: what to cover, and facts Claude may use (e.g. “Explain the retry setting: 3 tries, 30 seconds apart”). Anything Claude adds from general knowledge is marked for a fact check." />
       <div v-if="inClaudeCode" class="space-y-1.5" data-claude-code>
         <p class="text-slate-600">
           Reviews run in Claude Code on the owner's Claude plan, so only they can start one here. With Claude Code in
@@ -260,6 +296,7 @@ onBeforeUnmount(() => {
         <option value="all">All kinds</option>
         <option value="text">Wording</option>
         <option value="restructure">Structure</option>
+        <option value="expand">Expand</option>
       </select>
       <label class="flex items-center gap-1.5 text-slate-600"
         ><input v-model="showAll" type="checkbox" /> Show resolved</label
@@ -314,6 +351,19 @@ onBeforeUnmount(() => {
             <span v-if="suggestion.kind === 'restructure'" class="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-800">
               structure
             </span>
+            <template v-if="suggestion.kind === 'expand'">
+              <span class="rounded bg-sky-50 px-1.5 py-0.5 text-sky-800">expand</span>
+              <span
+                v-if="needsFactCheck(suggestion)"
+                class="rounded bg-rose-50 px-1.5 py-0.5 font-medium text-rose-800"
+                data-fact-check
+                title="Uses Claude's general knowledge, not this document or your brief: check it before accepting"
+                >check facts</span
+              >
+              <span v-for="source in suggestion.sources.filter((s) => SOURCES[s])" :key="source" class="text-slate-500">
+                {{ SOURCES[source] }}
+              </span>
+            </template>
             <span v-if="suggestion.severity === 'major'" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800"
               >major</span
             >
@@ -329,6 +379,13 @@ onBeforeUnmount(() => {
               <span v-else>{{ part.text }}</span>
             </template>
           </p>
+
+          <div v-else-if="suggestion.kind === 'expand'" class="space-y-1" data-expansion>
+            <div class="text-[11px] text-slate-500">{{ POSITIONS[suggestion.position] }}</div>
+            <div class="prose-preview max-h-64 overflow-auto rounded border border-emerald-100 p-2">
+              <BlockList :nodes="previewNodes(suggestion.replacement ?? [])" />
+            </div>
+          </div>
 
           <div v-else class="grid grid-cols-2 gap-2">
             <div class="space-y-1">

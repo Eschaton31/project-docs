@@ -86,6 +86,24 @@ class ProseReviewCommandsTest extends TestCase
         $this->assertStringContainsString('Return an empty "restructure" list', $chunk);
     }
 
+    public function test_export_can_expand_with_a_brief_from_a_file(): void
+    {
+        File::ensureDirectoryExists($this->workDir);
+        File::put("{$this->workDir}/brief.txt", "Mention that reports run nightly.\n");
+
+        $this->artisan('prose-review:export', ['document' => $this->document->slug, '--kinds' => 'text,expand', '--brief-file' => "{$this->workDir}/brief.txt"])
+            ->assertSuccessful();
+
+        $review = ProseReview::query()->sole();
+        $this->assertSame(['text', 'expand'], $review->kinds);
+        $this->assertSame('Mention that reports run nightly.', $review->brief);
+        $this->assertStringContainsString('«Mention that reports run nightly.»', File::get("{$this->workDir}/{$review->id}/chunk-1.md"));
+        $this->assertStringContainsString('# Expand suggestions', File::get("{$this->workDir}/{$review->id}/instructions.md"));
+
+        $this->artisan('prose-review:export', ['document' => $this->document->slug, '--kinds' => 'expand', '--brief-file' => "{$this->workDir}/missing.txt"])
+            ->assertFailed();
+    }
+
     public function test_export_refuses_bad_input(): void
     {
         $this->artisan('prose-review:export', ['document' => 'nope'])->assertFailed();

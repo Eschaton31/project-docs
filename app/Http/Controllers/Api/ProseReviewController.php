@@ -62,6 +62,7 @@ class ProseReviewController extends Controller
             'requested_by' => $request->user()->id,
             'model' => $request->model(),
             'kinds' => $request->kinds(),
+            'brief' => $request->brief(),
             'status' => ProseReview::QUEUED,
         ]);
         ReviewProse::dispatch($review);

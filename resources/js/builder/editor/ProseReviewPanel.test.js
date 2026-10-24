@@ -254,6 +254,89 @@ describe('ProseReviewPanel', () => {
       blockId: 't1',
       kinds: ['text', 'restructure'],
       model: 'opus',
+      brief: null,
     })
+  })
+
+  it('asks for expansions with a brief, from here or in the Claude Code command', async () => {
+    const wrapper = await mountPanel()
+    expect(wrapper.find('textarea[aria-label="Brief"]').exists()).toBe(false)
+
+    const expand = wrapper.findAll('label').find((label) => label.text() === 'Expand')
+    await expand.find('input').setValue(true)
+    await wrapper.find('textarea[aria-label="Brief"]').setValue('  Explain retries:\n3 tries.  ')
+    http.post.mockResolvedValueOnce({
+      data: { review: { id: 10, status: 'queued', createdAt: new Date().toISOString() } },
+    })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(http.post).toHaveBeenCalledWith('/api/documents/doc/reviews', {
+      blockId: null,
+      kinds: ['text', 'restructure', 'expand'],
+      model: 'sonnet',
+      brief: 'Explain retries:\n3 tries.',
+    })
+
+    reviews.canStart = false
+    await flushPromises()
+    expect(wrapper.find('[data-claude-code] code').text()).toBe(
+      '/prose-review doc --kinds=text,restructure,expand --brief: Explain retries: 3 tries.'
+    )
+    wrapper.unmount()
+  })
+
+  it('previews an expansion, flags general knowledge, and accepting it is one undoable insert', async () => {
+    const expansion = {
+      id: 5,
+      kind: 'expand',
+      rule: 'introduction',
+      severity: 'minor',
+      rationale: 'The section has no introduction.',
+      blockIds: ['t2'],
+      position: 'start',
+      sources: ['brief', 'general'],
+      replacement: [
+        {
+          type: 'Paragraph',
+          props: {},
+          options: {},
+          children: [{ type: 'RichText', props: { html: 'Reports run nightly.' }, options: {}, children: [] }],
+        },
+      ],
+      status: 'pending',
+    }
+    const list = http.get.getMockImplementation()
+    http.get.mockImplementation(async (url) =>
+      url === '/api/reviews/9'
+        ? { data: { review: { id: 9, status: 'done', model: 'sonnet' }, suggestions: [expansion] } }
+        : list(url)
+    )
+    const wrapper = await mountPanel()
+
+    const card = wrapper.find('[data-suggestion="5"]')
+    expect(card.find('[data-expansion]').text()).toContain('Adds at the start of this section')
+    expect(card.find('[data-expansion]').text()).toContain('Reports run nightly.')
+    expect(card.find('[data-fact-check]').exists()).toBe(true)
+    expect(card.text()).toContain('from your brief')
+
+    const added = node('p9', 'Paragraph', {}, [node('r9', 'RichText', { html: 'Reports run nightly.' })])
+    http.post.mockResolvedValueOnce({
+      data: {
+        suggestion: { ...expansion, status: 'accepted' },
+        change: {
+          seq: 2,
+          op: 'block.insert',
+          blockId: 'p9',
+          before: null,
+          after: { blocks: [{ ...added, parentId: 't2' }] },
+        },
+      },
+    })
+    await card.find('button').trigger('click')
+    await flushPromises()
+
+    expect(editor.get('t2').children.map((child) => child.id)).toEqual(['p9'])
+    expect(editor.undoStack.at(-1)).toMatchObject({ kind: 'insert', ids: ['p9'] })
   })
 })

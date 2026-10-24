@@ -27,9 +27,11 @@ class ProseReviews
         $this->assertPending($suggestion);
 
         try {
-            $revision = $suggestion->kind === ProseSuggestion::TEXT
-                ? $this->applyText($suggestion, $user)
-                : $this->applyRestructure($suggestion, $user);
+            $revision = match ($suggestion->kind) {
+                ProseSuggestion::TEXT => $this->applyText($suggestion, $user),
+                ProseSuggestion::EXPAND => $this->applyExpand($suggestion, $user),
+                default => $this->applyRestructure($suggestion, $user),
+            };
         } catch (StaleVersionException) {
             // someone saved one of the blocks between our check and the write
             throw $this->stale($suggestion);
@@ -116,6 +118,30 @@ class ProseReviews
         }
 
         return $this->editor->replaceBlocks($suggestion->review->document, $user, $suggestion->block_ids, $versions, $suggestion->replacement);
+    }
+
+    /**
+     * Inserts new blocks and leaves the rest alone, so edits to the anchor since the review don't matter; it only
+     * has to still be there (and, for a sibling position, under the same parent).
+     */
+    private function applyExpand(ProseSuggestion $suggestion, User $user): Revision
+    {
+        $document = $suggestion->review->document;
+        $anchor = $document->blocks()->whereKey($suggestion->block_ids[0])->first();
+        $parentId = $suggestion->parent_id;
+        if (! $anchor || (in_array($suggestion->position, ['before', 'after'], true) && $anchor->parent_id !== $parentId)) {
+            throw $this->stale($suggestion);
+        }
+
+        [$afterId, $beforeId] = match ($suggestion->position) {
+            'before' => [null, $anchor->id],
+            'after' => [$anchor->id, null],
+            // the first child, if any; with neither neighbour the blocks go at the end
+            'start' => [null, $document->blocks()->where('parent_id', $anchor->id)->orderBy('position')->value('id')],
+            'end' => [null, null],
+        };
+
+        return $this->editor->insertTree($document, $user, $parentId, $afterId, $beforeId, $suggestion->replacement);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Ai\ProseExtractor;
 use App\Ai\ReviewRun;
 use App\Models\ProseReview;
+use App\Models\ProseSuggestion;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -73,7 +74,7 @@ class ImportProseReview extends Command
         if (! is_array($output) || array_is_list($output)) {
             return [[], 'not a JSON object ('.(json_last_error() ? json_last_error_msg() : 'wrong shape').')'];
         }
-        foreach (['text', 'restructure'] as $key) {
+        foreach (ProseSuggestion::KINDS as $key) {
             if (! is_array($output[$key] ?? []) || ! array_is_list($output[$key] ?? [])) {
                 return [[], "\"{$key}\" must be a list"];
             }

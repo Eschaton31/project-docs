@@ -22,7 +22,7 @@ final class SuggestionValidator
 
     /**
      * @param  list<string>  $chunk  refs of the blocks under review
-     * @param  list<string>  $kinds  text, restructure
+     * @param  list<string>  $kinds  text, restructure, expand
      */
     public function __construct(private ProseSnapshot $snapshot, array $chunk, private array $kinds)
     {
@@ -30,7 +30,7 @@ final class SuggestionValidator
     }
 
     /**
-     * @param  array{text?: list<array>, restructure?: list<array>}  $output
+     * @param  array{text?: list<array>, restructure?: list<array>, expand?: list<array>}  $output
      * @return list<array> attributes for ProseSuggestion rows (without review_id)
      */
     public function validate(array $output): array
@@ -42,6 +42,9 @@ final class SuggestionValidator
         }
         foreach ($output['restructure'] ?? [] as $suggestion) {
             $rows[] = $this->attempt(fn () => $this->restructure($suggestion), ProseSuggestion::RESTRUCTURE);
+        }
+        foreach ($output['expand'] ?? [] as $suggestion) {
+            $rows[] = $this->attempt(fn () => $this->expand($suggestion), ProseSuggestion::EXPAND);
         }
 
         return array_values(array_filter($rows));
@@ -139,6 +142,49 @@ final class SuggestionValidator
             'block_versions' => $versions,
             'replacement' => $nodes,
             'parent_id' => $parent === null ? null : $this->snapshot->blocks[$parent]['id'],
+        ];
+    }
+
+    /**
+     * New blocks only, placed next to or inside the anchor; nothing already there is touched.
+     */
+    private function expand(array $suggestion): array
+    {
+        $anchor = (string) ($suggestion['anchor'] ?? '');
+        $this->assert(isset($this->snapshot->blocks[$anchor]), 'unknown block');
+        $this->assert(isset($this->inChunk[$anchor]), 'block not under review');
+
+        $position = $suggestion['position'] ?? null;
+        $this->assert(in_array($position, ProseSuggestion::POSITIONS, true), 'unknown position');
+        $parent = in_array($position, ['start', 'end'], true) ? $anchor : $this->snapshot->blocks[$anchor]['parent'];
+
+        $sources = array_values(array_unique((array) ($suggestion['sources'] ?? [])));
+        $this->assert($sources !== [] && array_diff($sources, ProseSuggestion::SOURCES) === [], 'unknown sources');
+
+        $nodes = json_decode((string) ($suggestion['blocks_json'] ?? ''), true);
+        $this->assert(is_array($nodes) && $nodes !== [] && array_is_list($nodes), 'replacement is not a list of nodes');
+        $none = [];
+        // with nothing replaced, any {"keep": …} is refused
+        $nodes = $this->resolveAll($nodes, [], $none);
+
+        $parentType = $parent === null ? null : $this->snapshot->blocks[$parent]['type'];
+        try {
+            app(DocumentTree::class)->assertValidNodes($nodes, $parentType);
+        } catch (ValidationException) {
+            throw new Rejected('replacement breaks nesting rules');
+        }
+
+        $block = $this->snapshot->blocks[$anchor];
+
+        return [
+            ...$this->common($suggestion),
+            'kind' => ProseSuggestion::EXPAND,
+            'block_ids' => [$block['id']],
+            'block_versions' => [$block['id'] => $block['version']],
+            'replacement' => $nodes,
+            'parent_id' => $parent === null ? null : $this->snapshot->blocks[$parent]['id'],
+            'position' => $position,
+            'sources' => $sources,
         ];
     }
 

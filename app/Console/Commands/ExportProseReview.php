@@ -8,6 +8,7 @@ use App\Ai\ReviewPrompt;
 use App\Ai\ReviewRun;
 use App\Models\Document;
 use App\Models\ProseReview;
+use App\Models\ProseSuggestion;
 use App\Models\User;
 use App\Services\DocumentTree;
 use Illuminate\Console\Attributes\Description;
@@ -23,7 +24,8 @@ use Illuminate\Support\Facades\File;
 #[Signature('prose-review:export
     {document : Slug of the document to review}
     {--block= : Review only this block (usually a topic) and everything inside it}
-    {--kinds=text,restructure : What to suggest: text (wording), restructure (block structure), or both}
+    {--kinds=text,restructure : What to suggest, comma separated: text (wording), restructure (block structure), expand (add missing content)}
+    {--brief-file= : A text file with the admin\'s brief: what to cover when expanding, and facts to use}
     {--user= : Email of the admin the review is for}')]
 #[Description('Prepare an AI prose review for Claude Code to run')]
 class ExportProseReview extends Command
@@ -41,8 +43,17 @@ class ExportProseReview extends Command
         }
 
         $kinds = array_values(array_unique(array_filter(array_map('trim', explode(',', (string) $this->option('kinds'))))));
-        if ($kinds === [] || array_diff($kinds, ['text', 'restructure'])) {
-            return $this->fail('--kinds takes text, restructure, or both (comma separated).');
+        if ($kinds === [] || array_diff($kinds, ProseSuggestion::KINDS)) {
+            return $this->fail('--kinds takes any of '.implode(', ', ProseSuggestion::KINDS).' (comma separated).');
+        }
+
+        $briefFile = $this->option('brief-file');
+        if ($briefFile && ! File::isFile($briefFile)) {
+            return $this->fail("No brief file at [{$briefFile}].");
+        }
+        $brief = $briefFile ? trim(File::get($briefFile)) ?: null : null;
+        if ($brief !== null && mb_strlen($brief) > ProseReview::MAX_BRIEF) {
+            return $this->fail('The brief is longer than '.ProseReview::MAX_BRIEF.' characters.');
         }
 
         $user = $this->option('user') ? User::query()->where('email', $this->option('user'))->first() : null;
@@ -55,6 +66,7 @@ class ExportProseReview extends Command
             'requested_by' => $user?->id,
             'model' => ProseReview::CLAUDE_CODE,
             'kinds' => $kinds,
+            'brief' => $brief,
             'status' => ProseReview::AWAITING,
         ]);
         $nodes = ReviewRun::read($review, $tree);
@@ -75,7 +87,7 @@ class ExportProseReview extends Command
         foreach ($chunks as $i => $chunk) {
             $n = $i + 1;
             $answer = self::answerPath($review, $n);
-            File::put("{$dir}/chunk-{$n}.md", "# Chunk {$n} of ".count($chunks)."\n\nWrite your answer to: {$answer}\n\n".ReviewPrompt::render($snapshot, $chunk, $kinds)."\n");
+            File::put("{$dir}/chunk-{$n}.md", "# Chunk {$n} of ".count($chunks)."\n\nWrite your answer to: {$answer}\n\n".ReviewPrompt::render($snapshot, $chunk, $kinds, $brief)."\n");
         }
 
         $this->line("Review: {$review->id}");
@@ -122,11 +134,17 @@ class ExportProseReview extends Command
             {"blocks": ["B4"],
              "replacement_json": "[{\"type\": \"BulletList\", \"props\": {\"list\": [\"PHP\", \"A database\"]}}]",
              "rule": "list", "rationale": "Parallel items read better as a list.", "severity": "major"}
+          ],
+          "expand": [
+            {"anchor": "B1", "position": "start",
+             "blocks_json": "[{\"type\": \"Paragraph\", \"props\": {}, \"children\": [{\"type\": \"RichText\", \"props\": {\"html\": \"Before you start, make sure you have the following installed.\"}}]}]",
+             "sources": ["document"], "rule": "introduction",
+             "rationale": "The section opens with a list and no introduction.", "severity": "minor"}
           ]
         }
 
-        - Both lists are required; use [] when there is nothing to suggest.
-        - "replacement_json" is a string that contains JSON (escape its quotes).
+        - All three lists are required; use [] when there is nothing to suggest.
+        - "replacement_json" and "blocks_json" are strings that contain JSON (escape their quotes).
         - "rule" is one of: {$rules}. "severity" is "minor" or "major".
         - Copy "original" from the segment exactly, HTML included; a suggestion whose original isn't found
           exactly once in its segment is discarded when the answers are imported.

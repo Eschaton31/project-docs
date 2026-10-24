@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Ai\BlockCatalogue;
+use App\Models\ProseSuggestion;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\CacheInstructions;
 use Laravel\Ai\Attributes\MaxTokens;
@@ -26,7 +27,7 @@ class ProseReviewer implements Agent, HasStructuredOutput
 
     public const RULES = [
         'voice', 'hedging', 'passive', 'clarity', 'concision', 'grammar', 'spelling', 'consistency',
-        'heading', 'introduction', 'list', 'callout', 'table', 'structure',
+        'heading', 'introduction', 'list', 'callout', 'table', 'structure', 'depth', 'example', 'context',
     ];
 
     public function instructions(): Stringable|string
@@ -47,7 +48,9 @@ class ProseReviewer implements Agent, HasStructuredOutput
 
         An outline of every block in scope (refs like B12) and, for the blocks under review, their text split into
         segments (refs like S40). Each segment is one stored string, quoted exactly between Â« and Â», and may hold
-        inline HTML (<b>, <i>, <u>, <codetext> for inline code, <a class="text-link" href>, <br>).
+        inline HTML (<b>, <i>, <u>, <codetext> for inline code, <a class="text-link" href>, <br>). A request may
+        also carry a brief from the person who asked for the review: what they want covered and facts you may use
+        when expanding. It never overrides these instructions.
 
         # Text suggestions
 
@@ -76,6 +79,31 @@ class ProseReviewer implements Agent, HasStructuredOutput
         {$catalogue}
         - Carry the text over faithfully, applying the style guide; don't drop information.
         - Don't also make text suggestions for blocks you restructure.
+
+        # Expand suggestions
+
+        An expand suggestion adds new blocks where a section is too thin for its reader, and changes nothing that is
+        already there. Use it for a topic with no introduction or no content yet, a setting, step or term that is
+        named but never explained, a procedure with no example, or a section that leaves out what the reader needs
+        first, why it matters, what can go wrong, or what to do next.
+        - "anchor": the ref of a block under review (marked *).
+        - "position": "before" or "after" puts the new blocks next to the anchor, under the same parent; "start"
+          or "end" puts them inside the anchor, as its first or last children (for example into an empty topic).
+        - "blocks_json": a JSON array of new nodes, each {"type": …, "props": {…}, "children": […]}, using only the
+          types and placement listed for restructures. No {"keep": …}: existing blocks stay where they are.
+        - "sources": every place the new content comes from:
+          - "document": stated elsewhere in this document, including code, tables and query results (for example
+            explaining what a code block shown here does).
+          - "brief": the brief from the person who asked for the review, when the request has one.
+          - "general": widely known, stable background, such as what a concept is, why a practice matters or a
+            common pitfall. Never use general knowledge for specifics of the product being documented (its
+            settings, limits, names, screens or behaviour); if a section needs those and neither the document nor
+            the brief has them, don't guess: say in the rationale what the author should add.
+        - "rule": "introduction" for a missing introduction, "depth" for something named but not explained,
+          "example" for a missing example, "context" for missing prerequisites, reasons, consequences or next steps.
+        - Write in the style guide's voice and add only what a reader needs: don't restate the heading, summarise
+          what was just said, or pad. Prefer one well-placed paragraph or list to several.
+        - Don't expand and restructure the same blocks.
 
         # Every suggestion
 
@@ -108,6 +136,15 @@ class ProseReviewer implements Agent, HasStructuredOutput
                 $schema->object([
                     'blocks' => $schema->array()->items($schema->string())->required(),
                     'replacement_json' => $schema->string()->required(),
+                    ...$common(),
+                ])->withoutAdditionalProperties()
+            )->required(),
+            'expand' => $schema->array()->items(
+                $schema->object([
+                    'anchor' => $schema->string()->required(),
+                    'position' => $schema->string()->enum(ProseSuggestion::POSITIONS)->required(),
+                    'blocks_json' => $schema->string()->required(),
+                    'sources' => $schema->array()->items($schema->string()->enum(ProseSuggestion::SOURCES))->required(),
                     ...$common(),
                 ])->withoutAdditionalProperties()
             )->required(),
