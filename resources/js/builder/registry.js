@@ -14,6 +14,7 @@ import Paragraph from '@/components/Paragraph.vue'
 import PrimaryTopic from '@/components/PrimaryTopic.vue'
 import QuaternaryTopic from '@/components/QuaternaryTopic.vue'
 import SecondaryTopic from '@/components/SecondaryTopic.vue'
+import Signature from '@/components/Signature.vue'
 import TertiaryTitle from '@/components/TertiaryTitle.vue'
 import TertiaryTopic from '@/components/TertiaryTopic.vue'
 import Breadcrumbs from '@/components/lists/Breadcrumbs.vue'
@@ -77,6 +78,12 @@ export const registry = {
   },
   Alert: { component: Alert, label: 'Alert', category: 'Text', props: ['type', 'title'], slot: 'blocks' },
   Placeholder: { component: Placeholder, label: 'Placeholder', category: 'Text', props: ['text'] },
+  Signature: {
+    component: Signature,
+    label: 'Signature',
+    category: 'Text',
+    props: ['label', 'name', 'designation', 'align'],
+  },
 
   Image: { component: Image, label: 'Image', category: 'Media', props: ['src', 'description', 'height'] },
   CodeBlock: { component: CodeBlock, label: 'Code', category: 'Media', props: ['code', 'label', 'lang'] },

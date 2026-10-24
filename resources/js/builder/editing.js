@@ -79,6 +79,15 @@ export const blockEditing = {
     },
   },
   Placeholder: { fields: [text('text', 'What goes here')], template: { props: { text: 'to be written' } } },
+  Signature: {
+    fields: [
+      text('label', 'Label', { placeholder: 'Prepared by:' }),
+      text('name', 'Name'),
+      text('designation', 'Designation (optional)'),
+      { name: 'align', label: 'Position', type: 'select', options: ['left', 'center', 'right'] },
+    ],
+    template: { props: { label: '', name: 'Full Name', designation: '', align: 'left' } },
+  },
 
   Image: {
     fields: [
@@ -273,7 +282,8 @@ export function newBlock(type) {
 export function blockLabel(node) {
   const props = node.props ?? {}
   const label = registry[node.type]?.label ?? node.type
-  const detail = props.title ?? props.text ?? props.description ?? props.label ?? stripHtml(props.html ?? '')
+  const detail =
+    props.title ?? props.text ?? props.description ?? props.name ?? props.label ?? stripHtml(props.html ?? '')
 
   return { label, detail: detail ? truncate(detail, 70) : '' }
 }

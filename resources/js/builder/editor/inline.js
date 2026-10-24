@@ -29,6 +29,7 @@ export const INLINE_EDITABLE = {
   QuaternaryTopic: { ...TITLE, hit: '.quaternary-topic' },
   TertiaryTitle: { kind: 'text', prop: 'text', slot: 'default' },
   Placeholder: { kind: 'text', prop: 'text', slot: 'default' },
+  Signature: { kind: 'text', prop: 'name', slot: 'name', hit: '.signature-name' },
   Alert: { kind: 'text', prop: 'title', slot: 'title', hit: '.alert-title' },
   Image: { kind: 'text', prop: 'description', slot: 'description', hit: '.image-caption' },
 
