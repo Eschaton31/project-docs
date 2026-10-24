@@ -12,7 +12,16 @@ import {
   textToTree,
   treeToText,
 } from './editing.js'
+import aiBlocks from './ai-blocks.json'
 import { canContain, registry } from './registry.js'
+
+describe('ai-blocks.json', () => {
+  it('lists the same props as each block type’s editing form', () => {
+    for (const [type, { props }] of Object.entries(aiBlocks)) {
+      expect(props, type).toEqual(blockEditing[type].fields.map((field) => field.name))
+    }
+  })
+})
 
 describe('outlineToNodes', () => {
   const shape = (nodes) => nodes.map((node) => [node.type, node.props.title, shape(node.children)])

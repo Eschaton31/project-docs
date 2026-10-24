@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Ai;
+
+/**
+ * Splits a snapshot into model-sized chunks and writes the prompt for each.
+ *
+ * Every prompt carries the whole outline (types, nesting and a short preview) so the model sees where the
+ * chunk sits, but only the chunk's blocks carry their full text, and only those can be changed.
+ */
+final class ReviewPrompt
+{
+    private const PREVIEW = 80;
+
+    /**
+     * @return list<list<string>> each chunk's block refs, in document order
+     */
+    public static function chunks(ProseSnapshot $snapshot, int $maxChars): array
+    {
+        $chunks = [];
+        $current = [];
+        $size = 0;
+
+        $add = function (array $refs, int $chars) use (&$chunks, &$current, &$size, $maxChars) {
+            if ($current && $size + $chars > $maxChars) {
+                $chunks[] = $current;
+                [$current, $size] = [[], 0];
+            }
+            array_push($current, ...$refs);
+            $size += $chars;
+        };
+
+        $pack = function (array $refs) use (&$pack, $add, $snapshot, $maxChars) {
+            foreach ($refs as $ref) {
+                $children = $snapshot->blocks[$ref]['children'];
+                if ($children && $snapshot->size($ref) > $maxChars) {
+                    $add([$ref], self::ownSize($snapshot, $ref));
+                    $pack($children);
+                } else {
+                    $add($snapshot->subtreeRefs($ref), $snapshot->size($ref));
+                }
+            }
+        };
+
+        $pack($snapshot->roots);
+        if ($current) {
+            $chunks[] = $current;
+        }
+
+        return array_values(array_filter($chunks, fn (array $chunk) => $snapshot->segmentsOf($chunk) !== []));
+    }
+
+    /**
+     * @param  list<string>  $chunk  block refs whose text is under review
+     * @param  list<string>  $kinds  text, restructure
+     */
+    public static function render(ProseSnapshot $snapshot, array $chunk, array $kinds): string
+    {
+        $inChunk = array_flip($chunk);
+        $lines = ['Suggestion kinds requested: '.implode(', ', $kinds).'.'];
+        if (! in_array('text', $kinds, true)) {
+            $lines[] = 'Return an empty "text" list.';
+        }
+        if (! in_array('restructure', $kinds, true)) {
+            $lines[] = 'Return an empty "restructure" list.';
+        }
+
+        $lines[] = '';
+        $lines[] = '## Document outline';
+        $lines[] = 'Every block in scope, for context. Blocks marked * are under review in this request.';
+        foreach ($snapshot->blocks as $ref => $block) {
+            $preview = self::preview($snapshot, $ref);
+            $lines[] = str_repeat('  ', $block['depth']).(isset($inChunk[$ref]) ? '* ' : '').$ref.' '.$block['type'].($preview !== '' ? " — {$preview}" : '');
+        }
+
+        $lines[] = '';
+        $lines[] = '## Blocks under review';
+        $lines[] = 'Text is quoted exactly as stored, between « and ».';
+        foreach ($chunk as $ref) {
+            $block = $snapshot->blocks[$ref];
+            $parent = $block['parent'] ? " (in {$block['parent']})" : ' (top level)';
+            $lines[] = '';
+            $lines[] = "{$ref} {$block['type']}{$parent}".self::flags($block['node']['props']);
+            foreach ($snapshot->segmentsOf([$ref]) as $segment) {
+                $lines[] = "  {$segment['ref']} [{$segment['path']}]: «{$segment['text']}»";
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private static function ownSize(ProseSnapshot $snapshot, string $ref): int
+    {
+        return array_sum(array_map(fn (array $segment) => mb_strlen($segment['text']), $snapshot->segmentsOf([$ref])));
+    }
+
+    private static function preview(ProseSnapshot $snapshot, string $ref): string
+    {
+        $text = implode(' ', array_column($snapshot->segmentsOf([$ref]), 'text'));
+        $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($text))));
+
+        return mb_strlen($text) > self::PREVIEW ? mb_substr($text, 0, self::PREVIEW - 1).'…' : $text;
+    }
+
+    /**
+     * Non-text props that matter when rewriting a block (an Alert's style, a list's bold), so a restructure keeps them.
+     */
+    private static function flags(array $props): string
+    {
+        $flags = array_filter(
+            array_intersect_key($props, array_flip(['type', 'bold', 'mono', 'indent', 'emDash', 'highlight', 'lang'])),
+            fn ($value) => is_scalar($value) && $value !== '' && $value !== false,
+        );
+
+        return $flags ? ' '.json_encode($flags, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '';
+    }
+}

@@ -1,0 +1,27 @@
+{
+  "PrimaryTopic": { "props": ["title"], "shape": "{\"title\": \"UPPERCASE TITLE\"}" },
+  "SecondaryTopic": { "props": ["title"], "shape": "{\"title\": \"Title Case\"}" },
+  "TertiaryTopic": { "props": ["title"], "shape": "{\"title\": \"Title Case\"}" },
+  "QuaternaryTopic": { "props": ["title"], "shape": "{\"title\": \"Title Case\"}" },
+  "Paragraph": { "props": ["indent"], "shape": "{} (its text goes in RichText children)" },
+  "RichText": { "props": ["html"], "shape": "{\"html\": \"Inline HTML: <b>, <i>, <u>, <codetext>, <a class=\\\"text-link\\\" href>, <br>\"}" },
+  "TertiaryTitle": { "props": ["text"], "shape": "{\"text\": \"Small heading\"}" },
+  "Alert": {
+    "props": ["type", "title"],
+    "shape": "{\"type\": \"info|warn|success|error\", \"title\": \"Note\"} (its text goes in one RichText child)"
+  },
+  "BulletList": {
+    "props": ["list", "bold"],
+    "shape": "{\"list\": [\"Item\", [\"Sub-item of the item before\"], \"Item\"]} (items may hold inline HTML)"
+  },
+  "NumberedList": { "props": ["list", "bold"], "shape": "{\"list\": [\"First step\", \"Second step\"]}" },
+  "ConceptList": {
+    "props": ["list", "emDash", "highlight"],
+    "shape": "{\"list\": [{\"id\": \"Term\", \"value\": \"Definition\", \"children\": [optional nested items]}]}"
+  },
+  "KeyValueTable": { "props": ["table"], "shape": "{\"table\": [{\"id\": \"Key\", \"value\": \"Value\"}]}" },
+  "ItemDescriptionTable": {
+    "props": ["itemName", "descriptionName", "data", "mono", "left", "widths"],
+    "shape": "{\"itemName\": \"Item\", \"descriptionName\": \"Description\", \"data\": [{\"item\": \"Item\", \"description\": \"Description\"}]}"
+  }
+}
