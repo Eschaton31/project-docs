@@ -32,9 +32,9 @@ const config = {
     textColor: TEXT,
     titleColor: TEAL,
 
-    // gantt
-    sectionBkgColor: '#f8fafc',
-    sectionBkgColor2: '#f8fafc',
+    // gantt: sections alternate between a teal wash and white so each group reads as its own band
+    sectionBkgColor: '#eef5f6',
+    sectionBkgColor2: '#eef5f6',
     altSectionBkgColor: '#ffffff',
     gridColor: '#e2e8f0',
     taskBkgColor: TEAL_TINT,
@@ -55,6 +55,9 @@ const config = {
     .task { stroke-width: 1px; }
     .grid .tick text { font-size: 11px; fill: #64748b; }
     .today { stroke-dasharray: 4 3; }
+    .section0, .section1, .section2, .section3 { opacity: 1; }
+    .sectionTitle { font-weight: 600; }
+    .section-divider { stroke: #b3d0d6; stroke-width: 1px; }
   `,
   gantt: {
     fontSize: 12,
@@ -87,11 +90,32 @@ function render() {
 
     return mermaid.render(`m-${Date.now()}`, props.code).then(({ svg }) => {
       chart.value.innerHTML = svg
+      divideSections(chart.value)
     })
   })
 
   // lets the print view wait for the diagram before paginating
   track?.(done)
+}
+
+// gantt draws one background row per task, classed by its section; rule a line wherever the
+// section changes so neighbouring groups don't run together
+function divideSections(el) {
+  const rows = [...el.querySelectorAll('rect.section')]
+
+  rows.forEach((row, i) => {
+    if (i === 0 || row.getAttribute('class') === rows[i - 1].getAttribute('class')) return
+
+    const x = Number(row.getAttribute('x'))
+    const y = row.getAttribute('y')
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+    line.setAttribute('class', 'section-divider')
+    line.setAttribute('x1', x)
+    line.setAttribute('x2', x + Number(row.getAttribute('width')))
+    line.setAttribute('y1', y)
+    line.setAttribute('y2', y)
+    row.after(line)
+  })
 }
 </script>
 
