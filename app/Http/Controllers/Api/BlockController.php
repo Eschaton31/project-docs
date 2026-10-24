@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\InsertTreeRequest;
 use App\Http\Requests\MoveBlockRequest;
+use App\Http\Requests\ReplaceBlocksRequest;
 use App\Http\Requests\StoreBlockRequest;
 use App\Http\Requests\UpdateBlockRequest;
 use App\Models\Block;
@@ -41,6 +42,22 @@ class BlockController extends Controller
         );
 
         return response()->json(['seq' => $revision->seq, 'blocks' => $revision->after['blocks']], 201);
+    }
+
+    /**
+     * Swaps neighbouring blocks for new ones in one change (undo and redo of an accepted restructure).
+     */
+    public function replace(ReplaceBlocksRequest $request, Document $document): JsonResponse
+    {
+        $revision = $this->editor->replaceBlocks(
+            $document,
+            $request->user(),
+            array_column($request->validated('blocks'), 'id'),
+            $request->versions(),
+            $request->validated('nodes'),
+        );
+
+        return response()->json(['seq' => $revision->seq, ...$revision->after]);
     }
 
     public function restore(Request $request, Block $block): JsonResponse

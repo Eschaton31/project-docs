@@ -79,7 +79,8 @@ class HistoryController extends Controller
     private function blockSummary(Revision $revision): ?array
     {
         $node = $revision->after ?? $revision->before;
-        if ($revision->op === 'block.insert') {
+        $many = in_array($revision->op, ['block.insert', 'block.replace'], true);
+        if ($many) {
             $node = $node['blocks'][0] ?? null;
         }
         if (! is_array($node) || ! isset($node['type'])) {
@@ -92,7 +93,7 @@ class HistoryController extends Controller
         return [
             'type' => $node['type'],
             'label' => mb_strimwidth(trim(preg_replace('/\s+/', ' ', (string) $label)), 0, 80, '…'),
-            'count' => $revision->op === 'block.insert' ? count($revision->after['blocks'] ?? []) : null,
+            'count' => $many ? count($revision->after['blocks'] ?? []) : null,
         ];
     }
 }

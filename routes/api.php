@@ -30,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/documents/{document}/blocks', [BlockController::class, 'store']);
     Route::post('/documents/{document}/blocks/tree', [BlockController::class, 'insertTree']);
+    Route::post('/documents/{document}/blocks/replace', [BlockController::class, 'replace']);
     Route::post('/blocks/{block}/restore', [BlockController::class, 'restore'])->withTrashed();
     Route::get('/blocks/{block}/revisions', [HistoryController::class, 'block'])->withTrashed();
     Route::patch('/blocks/{block}', [BlockController::class, 'update']);

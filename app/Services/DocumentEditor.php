@@ -155,6 +155,60 @@ class DocumentEditor
     }
 
     /**
+     * Replaces neighbouring sibling blocks, and everything inside them, with new nodes in one change: accepting
+     * a restructure suggestion, and undoing or redoing one (which replaces the result with copies of what was
+     * there). The revision keeps the removed subtrees.
+     *
+     * @param  list<string>  $blockIds  the siblings to replace, in document order
+     * @param  array<string, int>  $versions  block id => the version the caller saw; must include every block in
+     *                                        $blockIds and may include blocks inside them, all of which must be unchanged
+     * @param  list<array{type: string, props?: array, options?: array, children?: array}>  $nodes
+     */
+    public function replaceBlocks(Document $document, User $user, array $blockIds, array $versions, array $nodes): Revision
+    {
+        return DB::transaction(function () use ($document, $user, $blockIds, $versions, $nodes) {
+            $document = $this->lock($document);
+            $blocks = $document->blocks()->whereKey($blockIds)->lockForUpdate()->get()->keyBy('id');
+            if ($blockIds === [] || $blocks->count() !== count(array_unique($blockIds))) {
+                throw ValidationException::withMessages(['blockIds' => 'Some of these blocks no longer exist.']);
+            }
+
+            $parentId = $blocks[$blockIds[0]]->parent_id;
+            $siblings = $document->blocks()->where('parent_id', $parentId)->orderBy('position')->pluck('position', 'id');
+            $order = $siblings->keys()->all();
+            $start = array_search($blockIds[0], $order, true);
+            if (array_slice($order, $start, count($blockIds)) !== $blockIds) {
+                throw ValidationException::withMessages(['blockIds' => 'Only neighbouring blocks under the same parent can be replaced together, in order.']);
+            }
+
+            $tree = app(DocumentTree::class);
+            $subtrees = array_map(fn (string $id) => $tree->subtree($blocks[$id]), $blockIds);
+            $ids = array_merge(...array_map($this->subtreeIds(...), $subtrees));
+
+            if (array_diff($blockIds, array_keys($versions))) {
+                throw ValidationException::withMessages(['versions' => 'The version of every replaced block is required.']);
+            }
+            $current = Block::query()->whereKey(array_keys($versions))->where('document_id', $document->id)->pluck('version', 'id');
+            $changed = array_filter($versions, fn ($version, $id) => (int) ($current[$id] ?? 0) !== (int) $version, ARRAY_FILTER_USE_BOTH);
+            if ($changed) {
+                throw new StaleVersionException(['blocks' => $subtrees]);
+            }
+            $this->locks->assertFree($document, $this->targets($ids));
+
+            $parent = $this->parent($document, $parentId);
+            $tree->assertValidNodes($nodes, $parent?->type);
+
+            $after = $order[$start - 1] ?? null;
+            $before = $order[$start + count($blockIds)] ?? null;
+            Block::query()->whereKey($ids)->update(['deleted_at' => now(), 'updated_by' => $user->id]);
+            $newIds = $tree->insertNodes($nodes, $document, $user, $parentId, $after ? $siblings[$after] : null, $before ? $siblings[$before] : null);
+            $inserted = Block::query()->whereKey($newIds)->orderBy('position')->get()->map(fn (Block $block) => $tree->subtree($block))->all();
+
+            return $this->record($document, $user, 'block.replace', $blockIds[0], ['blocks' => $subtrees], ['removed' => $blockIds, 'blocks' => $inserted]);
+        });
+    }
+
+    /**
      * Brings back a deleted block and everything that was deleted with it (undo of delete).
      */
     public function restoreBlock(Block $block, User $user): Revision

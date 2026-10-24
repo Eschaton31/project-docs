@@ -10,6 +10,7 @@ const VERBS = {
   'block.move': 'moved',
   'block.delete': 'deleted',
   'block.restore': 'restored',
+  'block.replace': 'restructured into',
   'document.update': 'changed the document settings',
   'document.create': 'created the document',
   'document.import': 'imported the document',
