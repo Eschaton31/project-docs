@@ -9,6 +9,7 @@ use App\Models\ProseSuggestion;
 use App\Models\User;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
 
 class ProseReviewApiTest extends TestCase
@@ -144,14 +145,37 @@ class ProseReviewApiTest extends TestCase
         $this->postJson("/api/documents/{$this->document->slug}/reviews")->assertTooManyRequests();
     }
 
-    public function test_with_the_claude_code_runner_the_editor_cannot_start_reviews(): void
+    public function test_with_the_claude_code_runner_and_no_owner_nobody_starts_reviews_from_the_editor(): void
     {
-        ProseReviewer::fake();
-        config(['ai-review.runner' => 'claude-code']);
+        Process::fake();
+        config(['ai-review.runner' => 'claude-code', 'ai-review.claude_code.user' => null]);
 
-        $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('runner', 'claude-code');
+        $this->getJson("/api/documents/{$this->document->slug}/reviews")
+            ->assertJsonPath('runner', 'claude-code')
+            ->assertJsonPath('canStart', false);
         $this->postJson("/api/documents/{$this->document->slug}/reviews")
             ->assertJsonValidationErrors(['review' => "run /prose-review {$this->document->slug}"]);
+        Process::assertNothingRan();
+    }
+
+    public function test_with_the_claude_code_runner_only_the_plan_owner_starts_reviews(): void
+    {
+        Process::fake(['*' => Process::result(json_encode([
+            'type' => 'result', 'subtype' => 'success', 'is_error' => false,
+            'structured_output' => ['text' => [], 'restructure' => []], 'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+        ]))]);
+        config(['ai-review.runner' => 'claude-code', 'ai-review.claude_code.user' => strtoupper($this->admin->email)]);
+
+        $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('canStart', true);
+        $review = $this->postJson("/api/documents/{$this->document->slug}/reviews", ['model' => 'opus'])->assertAccepted()->json('review');
+        $this->getJson("/api/reviews/{$review['id']}")->assertJsonPath('review.status', 'done');
+        Process::assertRanTimes(fn ($process) => in_array('opus', $process->command, true), 1);
+
+        // another admin sees the suggestions but can't spend the owner's plan
+        $this->actingAs(User::factory()->admin()->create());
+        $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('canStart', false);
+        $this->postJson("/api/documents/{$this->document->slug}/reviews")
+            ->assertJsonValidationErrors(['review' => 'only they can start one here']);
         ProseReviewer::assertNeverPrompted();
     }
 

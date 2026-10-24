@@ -30,6 +30,8 @@ export const useProseReviewStore = defineStore('proseReview', () => {
 
   // 'claude-code': reviews are started from Claude Code (/prose-review) with the user's own plan, not from here
   const runner = ref('api')
+  // whether this user's Review button starts one (with Claude Code: only the plan's owner)
+  const canStart = ref(true)
 
   let documentSlug = null
   let documentId = null
@@ -63,6 +65,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     try {
       const { data } = await http.get(`/api/documents/${documentSlug}/reviews`)
       runner.value = data.runner ?? 'api'
+      canStart.value = data.canStart ?? runner.value === 'api'
       if (data.reviews[0]) {
         review.value = data.reviews[0]
         await refresh()
@@ -173,6 +176,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     stopListening = null
     documentId = documentSlug = null
     runner.value = 'api'
+    canStart.value = true
     review.value = null
     suggestions.value = []
     slow.value = false
@@ -191,6 +195,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     notice,
     busy,
     runner,
+    canStart,
     openPanel,
     load,
     showLatest,

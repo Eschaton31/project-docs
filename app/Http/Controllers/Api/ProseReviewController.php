@@ -9,8 +9,10 @@ use App\Jobs\ReviewProse;
 use App\Models\Block;
 use App\Models\Document;
 use App\Models\ProseReview;
+use App\Models\User;
 use App\Services\DocumentTree;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,18 +22,24 @@ class ProseReviewController extends Controller
 {
     private const RECENT = 5;
 
-    public function index(Document $document): JsonResponse
+    public function index(Request $request, Document $document): JsonResponse
     {
         $reviews = $document->proseReviews()->latest('id')->limit(self::RECENT)->get();
 
-        // claude-code: reviews are started from Claude Code (/prose-review), not from the editor
-        return response()->json(['reviews' => $reviews->map->toSummary(), 'runner' => config('ai-review.runner')]);
+        return response()->json([
+            'reviews' => $reviews->map->toSummary(),
+            'runner' => config('ai-review.runner'),
+            // otherwise the editor shows the /prose-review command to run in Claude Code
+            'canStart' => $request->user()->canStartAiReviews(),
+        ]);
     }
 
     public function store(StoreProseReviewRequest $request, Document $document, DocumentTree $tree): JsonResponse
     {
-        if (config('ai-review.runner') !== 'api') {
-            throw ValidationException::withMessages(['review' => "Reviews run in Claude Code: run /prose-review {$document->slug} there."]);
+        if (! $request->user()->canStartAiReviews()) {
+            throw ValidationException::withMessages(['review' => config('ai-review.claude_code.user')
+                ? "Reviews run on the Claude plan of {$this->owner()}, so only they can start one here. Anyone with Claude Code in this project can run /prose-review {$document->slug}."
+                : "Reviews run in Claude Code: run /prose-review {$document->slug} there, or set AI_REVIEW_CLAUDE_CODE_USER to start them from here."]);
         }
 
         $running = $document->proseReviews()->whereIn('status', [ProseReview::QUEUED, ProseReview::RUNNING])->exists();
@@ -59,6 +67,13 @@ class ProseReviewController extends Controller
         ReviewProse::dispatch($review);
 
         return response()->json(['review' => $review->refresh()->toSummary()], 202);
+    }
+
+    private function owner(): string
+    {
+        $email = config('ai-review.claude_code.user');
+
+        return User::query()->where('email', $email)->value('name') ?? $email;
     }
 
     public function show(ProseReview $review): JsonResponse

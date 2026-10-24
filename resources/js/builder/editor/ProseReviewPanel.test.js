@@ -198,6 +198,21 @@ describe('ProseReviewPanel', () => {
     wrapper.unmount()
   })
 
+  it("gives the Claude plan's owner the Review button", async () => {
+    const list = http.get.getMockImplementation()
+    http.get.mockImplementation(async (url) =>
+      url === '/api/documents/doc/reviews'
+        ? { data: { runner: 'claude-code', canStart: true, reviews: [] } }
+        : list(url)
+    )
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-claude-code]').exists()).toBe(false)
+    expect(wrapper.find('button[type="submit"]').text()).toBe('Review')
+    expect(wrapper.text()).toContain('Runs in Claude Code with your plan')
+    expect(wrapper.find('input[type="radio"][value="opus"]').exists()).toBe(true)
+  })
+
   it('starts a review of the chosen section with the chosen model', async () => {
     editor.select('r1')
     const wrapper = await mountPanel()

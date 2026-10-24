@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Ai\Reviewers\ApiReviewer;
+use App\Ai\Reviewers\ChunkReviewer;
+use App\Ai\Reviewers\ClaudeCodeReviewer;
 use App\Models\User;
 use App\Pdf\BrowsershotRenderer;
 use App\Pdf\PdfRenderer;
@@ -21,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PdfRenderer::class, fn () => new BrowsershotRenderer(config('services.pdf')));
+        $this->app->bind(ChunkReviewer::class, fn () => config('ai-review.runner') === 'api' ? new ApiReviewer : new ClaudeCodeReviewer);
     }
 
     /**

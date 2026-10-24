@@ -290,6 +290,14 @@ of from the queue with an API key; a Pro/Max subscription can't back a multi-use
 The editor panel shows the command to run for the chosen scope instead of a Review button, and picks up the
 review when it is exported and imported. `ReviewRun` holds the steps both runners share.
 
+**Starting from the editor.** With `AI_REVIEW_CLAUDE_CODE_USER` set, that one account (the plan's owner) gets the
+Review button: `ReviewProse` runs on the `ai-review` worker and asks a `ChunkReviewer` per chunk. The runner picks
+`ApiReviewer` (the SDK agent) or `ClaudeCodeReviewer`, which runs `claude --print --restricted --tools ""
+--strict-mcp-config --no-session-persistence --system-prompt-file … --json-schema …` from an empty temp folder,
+signed in as the worker's account. No tools, settings, hooks, MCP servers or CLAUDE.md apply, since the document
+text is editor-written. Other admins see the `/prose-review` command instead. `php artisan prose-review:check-claude`
+confirms the worker's account can run Claude Code.
+
 ## Open items to confirm during Task 0
 
 - Exact laravel/ai agent, structured output and fake APIs (read the installed package).

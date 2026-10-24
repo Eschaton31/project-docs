@@ -28,6 +28,8 @@ class ProseReviewJobTest extends TestCase
     {
         parent::setUp();
 
+        // these tests fake the API agent; ClaudeCodeReviewerTest covers the claude-code runner
+        config(['ai-review.runner' => 'api']);
         $this->actingAs($this->admin = User::factory()->admin()->create());
         $this->document = Document::where('slug', $this->postJson('/api/documents', ['title' => 'Setup Guide'])->json('document.slug'))->firstOrFail();
 

@@ -54,8 +54,9 @@ const scopeChoices = computed(() => {
 const running = computed(() => ['queued', 'running'].includes(reviews.review?.status))
 const kinds = computed(() => [wording.value && 'text', structure.value && 'restructure'].filter(Boolean))
 
-// reviews run in Claude Code with the user's own Claude plan: show the command to run there
-const inClaudeCode = computed(() => reviews.runner === 'claude-code')
+// this user can't start reviews here (with Claude Code, only the plan's owner can): show the command to run
+// in Claude Code instead
+const inClaudeCode = computed(() => !reviews.canStart)
 const command = computed(() =>
   [
     `/prose-review ${editor.document.slug}`,
@@ -189,7 +190,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </template>
       </div>
       <div v-if="inClaudeCode" class="space-y-1.5" data-claude-code>
-        <p class="text-slate-600">Reviews run in Claude Code with your own Claude plan. In this project, run:</p>
+        <p class="text-slate-600">
+          Reviews run in Claude Code on the owner's Claude plan, so only they can start one here. With Claude Code in
+          this project, you can run:
+        </p>
         <div class="flex items-center gap-2">
           <code class="grow truncate rounded bg-white px-2 py-1 ring-1 ring-slate-200">{{ command }}</code>
           <button :disabled="!kinds.length" class="toolbar-button" type="button" @click="copyCommand">
@@ -201,13 +205,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <button class="underline" type="button" @click="reviews.showLatest()">Check now</button>
         </p>
       </div>
-      <button
-        v-else
-        :disabled="reviews.starting || running || !kinds.length"
-        class="rounded bg-bene-teal px-3 py-1 font-semibold text-white disabled:opacity-40"
-        type="submit">
-        {{ running ? 'Reviewing…' : reviews.starting ? 'Starting…' : 'Review' }}
-      </button>
+      <div v-else class="flex items-center gap-3">
+        <button
+          :disabled="reviews.starting || running || !kinds.length"
+          class="rounded bg-bene-teal px-3 py-1 font-semibold text-white disabled:opacity-40"
+          type="submit">
+          {{ running ? 'Reviewing…' : reviews.starting ? 'Starting…' : 'Review' }}
+        </button>
+        <span v-if="reviews.runner === 'claude-code'" class="text-slate-500">Runs in Claude Code with your plan</span>
+      </div>
     </form>
 
     <div class="space-y-1 px-3 pt-2 text-xs">

@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Ai\Agents\ProseReviewer;
 use App\Ai\ProseExtractor;
+use App\Ai\Reviewers\ChunkReviewer;
 use App\Ai\ReviewPrompt;
 use App\Ai\ReviewRun;
 use App\Models\ProseReview;
@@ -13,8 +13,9 @@ use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
 
 /**
- * Reviews a document (or one topic) chunk by chunk through the API and saves the suggestions that pass
- * validation. Nothing in the document changes here; an admin applies suggestions one by one.
+ * Reviews a document (or one topic) chunk by chunk, through the API or Claude Code depending on the runner, and
+ * saves the suggestions that pass validation. Nothing in the document changes here; an admin applies
+ * suggestions one by one.
  */
 class ReviewProse implements ShouldQueue
 {
@@ -27,11 +28,11 @@ class ReviewProse implements ShouldQueue
     public function __construct(public ProseReview $review)
     {
         $calls = (int) ceil(config('ai-review.max_chars_per_review') / config('ai-review.max_chars_per_chunk'));
-        $this->timeout = config('ai-review.timeout') * $calls + 60;
+        $this->timeout = app(ChunkReviewer::class)->timeout() * $calls + 60;
         $this->onConnection(config('ai-review.queue_connection'))->onQueue('ai-review');
     }
 
-    public function handle(DocumentTree $tree): void
+    public function handle(DocumentTree $tree, ChunkReviewer $reviewer): void
     {
         $review = $this->review;
         $review->update(['status' => ProseReview::RUNNING]);
@@ -43,15 +44,11 @@ class ReviewProse implements ShouldQueue
         $dropped = [];
 
         foreach ($chunks as $chunk) {
-            $response = ProseReviewer::make()->prompt(
-                ReviewPrompt::render($snapshot, $chunk, $review->kinds),
-                model: config('ai-review.models')[$review->model],
-                timeout: config('ai-review.timeout'),
-            );
+            $answer = $reviewer->review(ReviewPrompt::render($snapshot, $chunk, $review->kinds), $review->model);
 
-            $dropped = ReviewRun::addDropped($dropped, ReviewRun::save($review, $snapshot, $chunk, $response->structured));
-            $usage['input_tokens'] += $response->usage->inputTokens;
-            $usage['output_tokens'] += $response->usage->outputTokens;
+            $dropped = ReviewRun::addDropped($dropped, ReviewRun::save($review, $snapshot, $chunk, $answer['output']));
+            $usage['input_tokens'] += $answer['usage']['input_tokens'];
+            $usage['output_tokens'] += $answer['usage']['output_tokens'];
         }
 
         ReviewRun::finish($review, $usage, count($chunks), $dropped);

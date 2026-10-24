@@ -51,7 +51,8 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => 'ai-review',
-            'retry_after' => (int) env('AI_REVIEW_RETRY_AFTER', 1900),
+            // above the longest review job (ReviewProse::$timeout): 9 Claude Code chunks of up to 600s
+            'retry_after' => (int) env('AI_REVIEW_RETRY_AFTER', 6000),
             'after_commit' => false,
         ],
 

@@ -39,6 +39,23 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether the editor's Review button starts a review for this user. With the API any admin can; with Claude
+     * Code only the owner of the Claude plan it runs on (config ai-review.claude_code.user).
+     */
+    public function canStartAiReviews(): bool
+    {
+        if (! $this->isAdmin() || ! config('ai-review.enabled')) {
+            return false;
+        }
+        if (config('ai-review.runner') === 'api') {
+            return true;
+        }
+        $owner = config('ai-review.claude_code.user');
+
+        return is_string($owner) && $owner !== '' && strcasecmp($owner, $this->email) === 0;
+    }
+
+    /**
      * What the SPA should offer this user, sent with the user (login, /api/user).
      */
     protected function abilities(): Attribute
