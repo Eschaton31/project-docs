@@ -15,6 +15,7 @@ import { useEditorStore } from '@/stores/editor.js'
 
 import { BlockList } from '../BlockList.js'
 import { scrollToBlock } from '../scrollToBlock.js'
+import { findTextRange } from './findText.js'
 import { createInlineEdit, inlineEditCheck } from './inline.js'
 
 /**
@@ -27,6 +28,7 @@ import { createInlineEdit, inlineEditCheck } from './inline.js'
 const store = useEditorStore()
 const page = useTemplateRef('page')
 
+// keep in step with the store's canvasRootId, which says which blocks are on the page
 const root = computed(() => (store.selectedId ? store.rootOf(store.selectedId) : store.roots[0]) ?? null)
 
 // { id, coords } of the block being edited in place
@@ -58,6 +60,8 @@ function startEditing(id, target, coords = null) {
 
 // highlight via a stylesheet rather than classes, since the blocks are rendered by the hand-built components
 const highlight = document.createElement('style')
+// CSS Custom Highlight name for the phrase a hovered suggestion would change
+const PHRASE = 'pointed-phrase'
 onMounted(() => {
   document.head.appendChild(highlight)
   window.addEventListener('keydown', onKeydown)
@@ -74,7 +78,8 @@ const outline = (id, style) => {
   return `${selector}:not(.contents), .block-canvas :has(> ${selector}.contents) { outline: ${style}; outline-offset: 2px; }`
 }
 
-// the selection in teal; blocks other people are editing dashed, in their colour
+// the selection in teal; blocks other people are editing dashed, in their colour; blocks pointed at (a hovered
+// AI suggestion) in amber, with the phrase it would change marked
 watchEffect(() => {
   highlight.textContent = [
     ...store.othersLocks
@@ -82,8 +87,38 @@ watchEffect(() => {
       .map((lock) => outline(lock.target.slice(6), `2px dashed ${lock.color || '#64748b'}`)),
     // while typing in place the editor shows its own frame
     store.selectedId && editing.value?.id !== store.selectedId ? outline(store.selectedId, '2px solid #0b6374') : '',
+    ...(store.pointer?.ids ?? []).map((id) => pointed(id)),
+    `::highlight(${PHRASE}) { background-color: #fde68a; color: inherit; }`,
   ].join('\n')
 })
+
+function pointed(id) {
+  const selector = `.block-canvas [data-block-id="${id}"]`
+  const boxes = `${selector}:not(.contents), .block-canvas :has(> ${selector}.contents)`
+
+  return `${boxes} { outline: 2px solid #f59e0b; outline-offset: 2px; background-color: rgb(254 243 199 / 0.45); }`
+}
+
+// bring what's pointed at into view, and mark the phrase (where the browser has the CSS Custom Highlight API)
+watch(
+  () => [store.pointer, root.value],
+  async () => {
+    await nextTick()
+    const pointer = store.pointer
+    const elements = (pointer?.ids ?? [])
+      .map((id) => page.value?.querySelector(`[data-block-id="${CSS.escape(id)}"]`))
+      .filter(Boolean)
+
+    if (typeof CSS !== 'undefined' && CSS.highlights) {
+      const ranges = pointer?.text
+        ? elements.map((element) => findTextRange(element, pointer.text)).filter(Boolean)
+        : []
+      ranges.length ? CSS.highlights.set(PHRASE, new Highlight(...ranges)) : CSS.highlights.delete(PHRASE)
+    }
+    if (elements[0]) scrollToBlock(page.value, pointer.ids[0], { block: 'nearest', behavior: 'smooth' })
+  }
+)
+onBeforeUnmount(() => typeof CSS !== 'undefined' && CSS.highlights?.delete(PHRASE))
 
 watch(
   () => store.selectedId,

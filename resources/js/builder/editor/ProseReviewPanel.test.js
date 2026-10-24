@@ -213,6 +213,31 @@ describe('ProseReviewPanel', () => {
     expect(wrapper.find('input[type="radio"][value="opus"]').exists()).toBe(true)
   })
 
+  it('hovering a suggestion points at its blocks and, for wording, the phrase it changes', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.find('[data-suggestion="1"]').trigger('mouseenter')
+    expect(editor.pointer).toEqual({ ids: ['r1'], text: 'In order to install it' })
+
+    await wrapper.find('[data-suggestion="1"]').trigger('mouseleave')
+    expect(editor.pointer).toBe(null)
+
+    await wrapper.find('[data-suggestion="3"]').trigger('mouseenter')
+    expect(editor.pointer).toEqual({ ids: ['p1'], text: null })
+
+    wrapper.unmount()
+    expect(editor.pointer).toBe(null)
+  })
+
+  it('says where a block is when the canvas shows another topic', async () => {
+    const wrapper = await mountPanel()
+    const titles = wrapper.findAll('section > button').map((button) => button.text())
+
+    // the canvas shows SETUP (nothing selected): USAGE is elsewhere, the paragraph inside SETUP isn't
+    expect(titles.find((title) => title.includes('USAGE'))).toContain('not on the page, click to show')
+    expect(titles.find((title) => title.includes('Paragraph'))).not.toContain('click to show')
+  })
+
   it('starts a review of the chosen section with the chosen model', async () => {
     editor.select('r1')
     const wrapper = await mountPanel()

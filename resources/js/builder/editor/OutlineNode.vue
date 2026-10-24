@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, useTemplateRef, watch } from 'vue'
 
 import { reported, useEditorStore } from '@/stores/editor.js'
 
@@ -25,6 +25,14 @@ const label = computed(() => blockLabel(props.node))
 const isTopic = computed(() => registry[props.node.type]?.topic)
 const isCollapsed = computed(() => store.collapsed.has(props.node.id))
 const isSelected = computed(() => store.selectedId === props.node.id)
+// pointed at (a hovered AI suggestion): this row, or a folded row that hides it
+const isPointed = computed(() =>
+  (store.pointer?.ids ?? []).some(
+    (id) => id === props.node.id || (isCollapsed.value && store.isInside(id, props.node.id))
+  )
+)
+const row = useTemplateRef('row')
+watch(isPointed, (pointed) => pointed && row.value?.scrollIntoView?.({ block: 'nearest' }))
 const options = computed(() => props.node.options ?? {})
 const holder = computed(() => store.lockedByOther(`block:${props.node.id}`))
 
@@ -75,9 +83,11 @@ async function onDrop() {
 <template>
   <li>
     <div
+      ref="row"
       :class="[
         'group flex cursor-pointer items-center gap-1 rounded py-0.5 pr-2 text-[13px]',
         isSelected ? 'bg-teal-100 text-slate-900' : 'hover:bg-slate-100',
+        isPointed ? 'bg-amber-100 ring-1 ring-inset ring-amber-400' : '',
         zone === 'before' ? 'shadow-[inset_0_2px_0_#0b6374]' : '',
         zone === 'after' ? 'shadow-[inset_0_-2px_0_#0b6374]' : '',
         zone === 'inside' ? 'ring-2 ring-inset ring-bene-teal' : '',

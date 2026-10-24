@@ -57,7 +57,13 @@ export const useEditorStore = defineStore('editor', () => {
   let leaveChannel = null
   let timers = []
 
+  // blocks something points at without selecting them (hovering an AI suggestion): { ids, text } or null; text is
+  // the phrase inside them to mark, if any
+  const pointer = shallowRef(null)
+
   const selected = computed(() => (selectedId.value ? (index.get(selectedId.value)?.node ?? null) : null))
+  /** The top-level block the canvas shows: the one holding the selection, or the first. */
+  const canvasRootId = computed(() => (selectedId.value ? rootOf(selectedId.value)?.id : roots.value[0]?.id) ?? null)
   /** Live locks held by other tabs. */
   const othersLocks = computed(() =>
     [...locks.value.values()].filter((lock) => lock.expiresAt > clock.value && lock.clientId !== clientId)
@@ -99,6 +105,7 @@ export const useEditorStore = defineStore('editor', () => {
     document.value = null
     roots.value = []
     selectedId.value = null
+    pointer.value = null
     undoStack.value = []
     redoStack.value = []
     failed.value = false
@@ -159,6 +166,11 @@ export const useEditorStore = defineStore('editor', () => {
     selectedId.value = id
     if (id) reveal(id)
     claim(id ? `block:${id}` : null)
+  }
+
+  /** Marks blocks (and optionally a phrase in them) in the canvas and outline; point(null) clears it. */
+  function point(ids, text = null) {
+    pointer.value = ids?.length ? { ids: [...ids], text: text || null } : null
   }
 
   function reveal(id) {
@@ -744,6 +756,9 @@ export const useEditorStore = defineStore('editor', () => {
     roots,
     selectedId,
     selected,
+    canvasRootId,
+    pointer,
+    point,
     collapsed,
     undoStack,
     redoStack,

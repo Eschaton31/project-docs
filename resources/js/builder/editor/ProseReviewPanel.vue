@@ -154,6 +154,22 @@ function previewNodes(nodes, prefix = 'preview') {
 
 const STATUS = { accepted: 'Accepted', dismissed: 'Dismissed', stale: 'Text changed since the review' }
 
+/** Hovering a suggestion marks its blocks in the canvas and outline, and for wording the phrase it changes. */
+function pointAt(suggestion) {
+  editor.point(suggestion.blockIds, suggestion.kind === 'text' ? plainText(suggestion.original) : null)
+}
+
+/** Where a block is when the canvas shows another topic, so it can't be marked there (clicking goes to it). */
+function elsewhere(group) {
+  if (!group.node) return null
+  const topic = editor.rootOf(group.id)
+  if (!topic || topic.id === editor.canvasRootId) return null
+  if (topic.id === group.id) return 'not on the page, click to show'
+  const { label, detail } = blockLabel(topic)
+
+  return `in “${detail || label}”, click to show`
+}
+
 function onKeydown(event) {
   if (event.key === 'Escape') emit('close')
 }
@@ -162,7 +178,10 @@ onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   reviews.load(editor.document)
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  editor.point(null)
+})
 </script>
 
 <template>
@@ -265,18 +284,31 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :disabled="!group.node"
           class="w-full truncate text-left text-xs font-semibold text-slate-700 hover:underline disabled:no-underline"
           type="button"
-          @click="editor.select(group.id)">
+          @blur="editor.point(null)"
+          @click="editor.select(group.id)"
+          @focus="editor.point([group.id])"
+          @mouseenter="editor.point([group.id])"
+          @mouseleave="editor.point(null)">
           {{ groupTitle(group) }}
+          <span v-if="elsewhere(group)" class="font-normal text-slate-400" data-elsewhere>
+            · {{ elsewhere(group) }}
+          </span>
         </button>
 
         <article
           v-for="suggestion in group.items"
           :key="suggestion.id"
           :class="[
-            'space-y-2 rounded border p-2 text-xs',
-            suggestion.status === 'pending' ? 'border-slate-200' : 'border-slate-100 opacity-60',
+            'space-y-2 rounded border p-2 text-xs transition-colors',
+            suggestion.status === 'pending'
+              ? 'border-slate-200 hover:border-amber-400 hover:bg-amber-50/40'
+              : 'border-slate-100 opacity-60',
           ]"
-          :data-suggestion="suggestion.id">
+          :data-suggestion="suggestion.id"
+          @focusin="pointAt(suggestion)"
+          @focusout="editor.point(null)"
+          @mouseenter="pointAt(suggestion)"
+          @mouseleave="editor.point(null)">
           <div class="flex flex-wrap items-center gap-1.5">
             <span class="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">{{ suggestion.rule }}</span>
             <span v-if="suggestion.kind === 'restructure'" class="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-800">
