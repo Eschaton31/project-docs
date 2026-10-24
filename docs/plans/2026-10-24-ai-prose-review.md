@@ -253,6 +253,27 @@ Commit: `feat(ai): prose review panel in the editor`
 - Queue: reviews run on the existing worker (`composer prod` runs `queue:work`); set the job `$timeout` from config
   (chunks × per-call timeout).
 
+## Implementation notes (where the build differs from the plan)
+
+- **Text is reviewed as stored.** Segments send the block's inline HTML (`<b>`, `<codetext>`, links) unchanged instead
+  of converting to plain text, so `original` matches the stored string exactly and nothing is lost on apply.
+- **Short refs.** The model cites `B12` / `S40` instead of UUIDs; `ProseSnapshot` maps them back.
+- **Replacements come back as a JSON string** (`replacement_json`): nodes nest, and the schema builder can't recurse.
+  `{"keep": "B7"}` carries an existing block (code, images, query results) over unchanged; non-prose blocks must be
+  kept this way or the restructure is dropped.
+- **Block catalogue** lives in `resources/js/builder/ai-blocks.json`; a Vitest test keeps its prop lists equal to the
+  editing forms in `editing.js`.
+- **Undo of a restructure** swaps the result back for copies of the original blocks through
+  `POST /documents/{document}/blocks/replace` (redo swaps again). The copies get new ids; props, options and anchors
+  are kept, but per-block history starts again on them.
+- **Own queue.** Reviews run on the `ai-review` queue connection (`retry_after` 1900s, job timeout 1680s) because one
+  job makes several model calls; `composer dev` and `composer prod` start a worker for it.
+- **Channel name** is `document.{id}.reviews`, alongside the existing `document.{id}` presence channel.
+- **No factories** for the review models, matching the rest of the app (tests build documents through the API); a
+  `UserFactory::admin()` state was added.
+- **The SPA learns whether to show the feature** from `abilities.aiReview` on the user payload (admin and
+  `AI_REVIEW_ENABLED`).
+
 ## Open items to confirm during Task 0
 
 - Exact laravel/ai agent, structured output and fake APIs (read the installed package).
