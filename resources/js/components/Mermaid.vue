@@ -52,9 +52,11 @@ const config = {
     todayLineColor: TEAL,
   },
   themeCSS: `
+    .titleText { font-size: 15px; font-weight: 600; fill: ${TEAL}; }
     .task { stroke-width: 1px; }
+    .grid .tick line { stroke: #dbe5e8; }
     .grid .tick text { font-size: 11px; fill: #64748b; }
-    .today { stroke-dasharray: 4 3; }
+    .today { stroke-width: 1.5px; stroke-dasharray: 4 3; }
     .section0, .section1, .section2, .section3 { opacity: 1; }
     .sectionTitle { font-weight: 600; }
     .section-divider { stroke: #b3d0d6; stroke-width: 1px; }
@@ -64,11 +66,20 @@ const config = {
     sectionFontSize: 12,
     barHeight: 24,
     barGap: 6,
+    topPadding: 50,
+    // start the grid lines where the first section row starts (topPadding - 2), so no stubs poke
+    // out between the title and the chart
+    gridLineStartPadding: 48,
     leftPadding: 130,
     rightPadding: 24,
     axisFormat: '%b %d',
   },
 }
+
+// mermaid draws section titles at a fixed x of 10 and never wraps them, so long ones run under
+// the bars; keep this much clear space between a title and the plot
+const LABEL_X = 10
+const LABEL_GAP = 12
 
 onMounted(render)
 
@@ -80,22 +91,76 @@ watch(
 function render() {
   renderKey.value++ // 🔥 force DOM reset
 
-  const done = nextTick().then(() => {
+  // titles are measured in Inter, so wait for it to load or the wrapping uses fallback metrics
+  const done = Promise.all([nextTick(), document.fonts?.ready]).then(() => {
     if (!chart.value) return
+
+    const { code, leftPadding } = wrapSections(props.code)
 
     // gantt charts size themselves to the temporary render container (the full page body) and then
     // get scaled down into the column, shrinking the text; lay them out at the column's real width
     const width = chart.value.clientWidth || undefined
-    mermaid.initialize({ ...config, gantt: { ...config.gantt, useWidth: width } })
+    mermaid.initialize({ ...config, gantt: { ...config.gantt, leftPadding, useWidth: width } })
 
-    return mermaid.render(`m-${Date.now()}`, props.code).then(({ svg }) => {
+    return mermaid.render(`m-${Date.now()}`, code).then(({ svg }) => {
       chart.value.innerHTML = svg
       divideSections(chart.value)
+      tidyGantt(chart.value)
     })
   })
 
   // lets the print view wait for the diagram before paginating
   track?.(done)
+}
+
+// break gantt section titles onto several lines (mermaid honours <br>) so each fits in the left
+// gutter; a single word wider than the gutter widens the gutter instead of being split
+function wrapSections(code) {
+  const { leftPadding, sectionFontSize } = config.gantt
+  if (!/^\s*gantt\b/m.test(code)) return { code, leftPadding }
+
+  const ctx = document.createElement('canvas').getContext('2d')
+  ctx.font = `600 ${sectionFontSize}px ${config.themeVariables.fontFamily}`
+  const measure = (text) => ctx.measureText(text).width
+
+  const room = leftPadding - LABEL_X - LABEL_GAP
+  let widest = 0
+
+  const wrapped = code.replace(/^(\s*section\s+)(.+)$/gm, (_, head, title) => {
+    const lines = title.split(/<br\s*\/?>/i).flatMap((part) => wrap(part, room, measure))
+    widest = Math.max(widest, ...lines.map(measure))
+    return head + lines.join('<br>')
+  })
+
+  return { code: wrapped, leftPadding: Math.max(leftPadding, Math.ceil(widest) + LABEL_X + LABEL_GAP) }
+}
+
+function wrap(text, room, measure) {
+  const lines = []
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const joined = lines.length ? `${lines.at(-1)} ${word}` : word
+    if (lines.length && measure(joined) <= room) lines[lines.length - 1] = joined
+    else lines.push(word)
+  }
+  return lines
+}
+
+// mermaid paints the grid before the opaque section rows, hiding it, and runs the today line from
+// the title down through the axis labels; lift the grid above the rows (still under the bars) and
+// clip the today line to the rows
+function tidyGantt(el) {
+  const rows = [...el.querySelectorAll('rect.section')]
+  if (!rows.length) return
+
+  const rowGroup = rows[0].parentNode
+  el.querySelectorAll('g.grid').forEach((grid) => rowGroup.after(grid))
+
+  const tops = rows.map((row) => Number(row.getAttribute('y')))
+  const bottoms = rows.map((row, i) => tops[i] + Number(row.getAttribute('height')))
+  el.querySelectorAll('line.today').forEach((line) => {
+    line.setAttribute('y1', Math.min(...tops))
+    line.setAttribute('y2', Math.max(...bottoms))
+  })
 }
 
 // gantt draws one background row per task, classed by its section; rule a line wherever the
