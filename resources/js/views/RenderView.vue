@@ -66,8 +66,9 @@ onMounted(async () => {
   <div v-if="error" class="p-8 text-sm text-rose-700">Could not load the document: {{ error }}</div>
   <!-- blocks lay out before Paged.js moves them onto pages, so hold them to the page's content width (A4 less
        the 0.5in side margins in app.css, the editor canvas's width too); otherwise anything that sizes itself
-       on mount, like a gantt chart, is laid out at the window's width and shrunk to fit the page -->
-  <div v-else-if="data" class="max-w-[7.27in]">
+       on mount, like a gantt chart, is laid out at the window's width and shrunk to fit the page. h-full keeps
+       the percentage-height chain from #app to the title page, which fills its page -->
+  <div v-else-if="data" class="h-full max-w-[7.27in]">
     <DocumentRenderer :blocks="data.blocks" :document="data.document" :mode />
   </div>
 </template>
