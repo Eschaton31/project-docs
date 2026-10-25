@@ -16,6 +16,9 @@ final class SuggestionValidator
     /** Inline tags the editor's rich text keeps (builder/editor/richText.js), and the attributes allowed on each. */
     private const TAGS = ['b' => [], 'strong' => [], 'i' => [], 'em' => [], 'u' => [], 'br' => [], 'codetext' => [], 'span' => [], 'a' => ['href', 'class', 'target']];
 
+    /** Props every block that has them keeps as a list (of items, rows or tree nodes). */
+    private const LIST_PROPS = ['list', 'data', 'table'];
+
     private array $inChunk;
 
     private array $dropped = [];
@@ -121,7 +124,13 @@ final class SuggestionValidator
 
         $kept = [];
         $nodes = $this->resolveAll($nodes, array_flip($replaced), $kept);
-        $this->assertNothingLost($replaced, $kept);
+        $edited = $this->editedInPlace($refs, $nodes);
+        if ($edited !== null) {
+            // props the edit leaves out stay as they were (a table's widths, a code block's label)
+            $nodes[0]['props'] += $this->snapshot->blocks[$edited]['node']['props'];
+            $this->assert($nodes[0]['props'] != $this->snapshot->blocks[$edited]['node']['props'], 'no change');
+        }
+        $this->assertNothingLost($replaced, $kept, $edited);
 
         $parentType = $parent === null ? null : $this->snapshot->blocks[$parent]['type'];
         try {
@@ -213,7 +222,17 @@ final class SuggestionValidator
         $this->assert(BlockCatalogue::creatable($type), 'type cannot be created');
         $props = $node['props'] ?? [];
         $this->assert(is_array($props) && array_diff(array_keys($props), BlockCatalogue::props($type)) === [], 'unknown props');
-        array_walk_recursive($props, fn ($value) => is_string($value) && $this->assertSafeHtml($value));
+        foreach (array_intersect_key($props, array_flip(self::LIST_PROPS)) as $list) {
+            $this->assert(is_array($list) && array_is_list($list), 'prop has the wrong shape');
+        }
+        foreach (BlockCatalogue::rawProps($type) as $raw) {
+            $this->assert(is_string($props[$raw] ?? ''), 'prop has the wrong shape');
+        }
+        // a block's content shows its segments as «S12»; a rewrite has to spell the text out
+        array_walk_recursive($props, fn ($value) => $this->assert(! is_string($value) || ! preg_match('/«S\d+»/u', $value), 'leaves a segment ref in the text'));
+        // source code is shown as text, not HTML
+        $html = array_diff_key($props, array_flip(BlockCatalogue::rawProps($type)));
+        array_walk_recursive($html, fn ($value) => is_string($value) && $this->assertSafeHtml($value));
 
         $children = $node['children'] ?? [];
         $this->assert(is_array($children) && array_is_list($children), 'replacement is not a list of nodes');
@@ -251,12 +270,33 @@ final class SuggestionValidator
     }
 
     /**
-     * Prose can be rewritten into new blocks, but anything else (code, images, query results) has to be kept.
+     * The ref of a data block (code, diagram, dictionary…) the restructure rewrites as one new block of the same
+     * type, the only way to change one; null when it isn't such an edit.
      */
-    private function assertNothingLost(array $replaced, array $kept): void
+    private function editedInPlace(array $refs, array $nodes): ?string
+    {
+        $block = $this->snapshot->blocks[$refs[0]];
+        if (count($refs) !== 1 || count($nodes) !== 1 || isset($nodes[0]['keptFrom'])
+            || $nodes[0]['type'] !== $block['type'] || ! BlockCatalogue::isData($block['type'])) {
+            return null;
+        }
+
+        $this->assert(! $block['truncated'], 'rewrites a block it could not see in full');
+
+        return $refs[0];
+    }
+
+    /**
+     * Prose can be rewritten into new blocks, but anything else (code, diagrams, images, query results) has to be
+     * kept, unless the suggestion is an in-place edit of that one data block.
+     */
+    private function assertNothingLost(array $replaced, array $kept, ?string $edited): void
     {
         foreach ($replaced as $ref) {
-            $this->assert(isset($kept[$ref]) || BlockCatalogue::creatable($this->snapshot->blocks[$ref]['type']), 'drops a block that is not prose');
+            $this->assert(
+                isset($kept[$ref]) || $ref === $edited || BlockCatalogue::rewritable($this->snapshot->blocks[$ref]['type']),
+                'drops a block that is not prose',
+            );
         }
     }
 

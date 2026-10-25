@@ -46,11 +46,32 @@ class ReviewPromptTest extends TestCase
         $this->assertSame([['B1', 'B2', 'B3'], ['B4', 'B5']], $chunks);
     }
 
-    public function test_chunks_without_any_text_are_dropped(): void
+    public function test_chunks_with_nothing_to_review_are_dropped(): void
     {
-        $snapshot = $this->snapshot([$this->node('CodeBlock', ['code' => 'SELECT 1;'])]);
+        $snapshot = $this->snapshot([$this->node('Paragraph', [])]);
 
         $this->assertSame([], ReviewPrompt::chunks($snapshot, 100));
+    }
+
+    public function test_a_structure_without_text_is_still_reviewed(): void
+    {
+        $snapshot = $this->snapshot([$this->node('Mermaid', ['code' => "flowchart LR\n  A --> B"])]);
+
+        $this->assertSame([['B1']], ReviewPrompt::chunks($snapshot, 100));
+        $prompt = ReviewPrompt::render($snapshot, ['B1'], ['restructure']);
+        // the outline previews the source; the block shows it in full
+        $this->assertStringContainsString('* B1 Mermaid — flowchart LR A --> B', $prompt);
+        $this->assertStringContainsString('  content: {"code":"flowchart LR\n  A --> B"}', $prompt);
+    }
+
+    public function test_structured_blocks_show_their_content_with_segment_refs(): void
+    {
+        $snapshot = $this->snapshot([$this->node('KeyValueTable', ['table' => [['id' => 'Host', 'value' => 'The database host']]])]);
+
+        $prompt = ReviewPrompt::render($snapshot, ['B1'], ['text', 'restructure']);
+
+        $this->assertStringContainsString('S1 [table.0.id]: «Host»', $prompt);
+        $this->assertStringContainsString('content: {"table":[{"id":"«S1»","value":"«S2»"}]}', $prompt);
     }
 
     public function test_the_prompt_shows_the_outline_and_only_the_chunks_text(): void
@@ -68,6 +89,8 @@ class ReviewPromptTest extends TestCase
         // full text only for the chunk, quoted exactly
         $this->assertStringContainsString('S2 [html]: «Reviewed <b>text</b>.»', $prompt);
         $this->assertStringNotContainsString('«Not in this chunk.»', $prompt);
+        // plain prose blocks don't repeat their text as content
+        $this->assertStringNotContainsString('  content:', $prompt);
     }
 
     public function test_the_prompt_says_when_restructures_are_not_wanted(): void

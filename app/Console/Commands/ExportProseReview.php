@@ -133,7 +133,10 @@ class ExportProseReview extends Command
           "restructure": [
             {"blocks": ["B4"],
              "replacement_json": "[{\"type\": \"BulletList\", \"props\": {\"list\": [\"PHP\", \"A database\"]}}]",
-             "rule": "list", "rationale": "Parallel items read better as a list.", "severity": "major"}
+             "rule": "list", "rationale": "Parallel items read better as a list.", "severity": "major"},
+            {"blocks": ["B9"],
+             "replacement_json": "[{\"type\": \"Mermaid\", \"props\": {\"code\": \"flowchart LR\\\\n  A[Upload] --> B[Validate] --> C[Publish]\"}}]",
+             "rule": "diagram", "rationale": "The diagram skips the validation step the text describes.", "severity": "major"}
           ],
           "expand": [
             {"anchor": "B1", "position": "start",

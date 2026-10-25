@@ -27,10 +27,20 @@ class ProseExtractorTest extends TestCase
                 ['list.0', 'list.1.0', 'list.1.1', 'list.2', 'list.3.list.0'],
             ],
             'numbered list' => ['NumberedList', ['list' => ['Step one', 'Step two']], ['list.0', 'list.1']],
-            'concept list: definitions, not terms' => [
+            'concept list: terms and definitions' => [
                 'ConceptList',
                 ['list' => [['id' => 'Draft', 'value' => 'Left out of the final version', 'children' => [['id' => 'Sub', 'value' => 'Nested']]]]],
-                ['list.0.value', 'list.0.children.0.value'],
+                ['list.0.id', 'list.0.value', 'list.0.children.0.id', 'list.0.children.0.value'],
+            ],
+            'concept list: terms highlighted as code are identifiers' => [
+                'ConceptList',
+                ['highlight' => true, 'list' => [['id' => 'APP_KEY', 'value' => 'Encryption key']]],
+                ['list.0.value'],
+            ],
+            'signature: label and designation, not the name' => [
+                'Signature',
+                ['label' => 'Prepared by:', 'name' => 'Juan dela Cruz', 'designation' => 'Data Manager', 'align' => 'left'],
+                ['label', 'designation'],
             ],
             'item description table: headings, descriptions and items' => [
                 'ItemDescriptionTable',
@@ -42,7 +52,7 @@ class ProseExtractorTest extends TestCase
                 ['mono' => true, 'data' => [['item' => 'APP_KEY', 'description' => 'Encryption key']]],
                 ['data.0.description'],
             ],
-            'key value table: values only' => ['KeyValueTable', ['table' => [['id' => 'Host', 'value' => 'The database host']]], ['table.0.value']],
+            'key value table: keys and values' => ['KeyValueTable', ['table' => [['id' => 'Host', 'value' => 'The database host']]], ['table.0.id', 'table.0.value']],
             'conversion dictionary' => ['ConversionDictionary', ['data' => [['item' => 'dob', 'description' => 'Date of birth', 'formats' => 'Y-m-d']]], ['data.0.description']],
             'data dictionary' => ['DataDictionary', ['data' => [['field' => 'id', 'description' => 'Primary key', 'type' => 'INT', 'values' => '']]], ['data.0.description']],
             'test scenarios: not the grouping column' => [
@@ -59,7 +69,7 @@ class ProseExtractorTest extends TestCase
             ],
             'code block label, not code' => ['CodeBlock', ['lang' => 'sql', 'label' => 'Find active clients', 'code' => 'SELECT 1;'], ['label']],
             'mermaid' => ['Mermaid', ['code' => 'flowchart LR'], []],
-            'tech stack' => ['TechStack', ['data' => [['component' => 'Queue', 'tech' => 'Redis', 'framework' => '']]], []],
+            'tech stack: components, not product names' => ['TechStack', ['data' => [['component' => 'Queue', 'tech' => 'Redis', 'framework' => '']]], ['data.0.component']],
             'breadcrumbs (must match the real UI)' => ['Breadcrumbs', ['list' => ['Menu', 'Submenu']], []],
         ];
     }
@@ -108,6 +118,31 @@ class ProseExtractorTest extends TestCase
         $this->assertSame(['B1'], $snapshot->roots);
         // segments follow document order
         $this->assertSame(['B1', 'B3'], array_column($snapshot->segments, 'block'));
+    }
+
+    public function test_structured_blocks_carry_their_props_with_segments_marked_by_ref(): void
+    {
+        $snapshot = (new ProseExtractor)->extract([
+            $this->node('RichText', ['html' => 'Intro.']),
+            $this->node('DataDictionary', ['data' => [['field' => 'id', 'description' => 'Primary key', 'type' => 'INT', 'values' => '']]]),
+            $this->node('Mermaid', ['code' => 'flowchart LR']),
+        ]);
+
+        $this->assertNull($snapshot->blocks['B1']['content']);
+        $this->assertSame('{"data":[{"field":"id","description":"«S2»","type":"INT","values":""}]}', $snapshot->blocks['B2']['content']);
+        $this->assertSame('{"code":"flowchart LR"}', $snapshot->blocks['B3']['content']);
+        $this->assertFalse($snapshot->blocks['B3']['truncated']);
+        // content counts towards the size, so chunks stay within the model's budget
+        $this->assertSame(mb_strlen('Intro.Primary key') + mb_strlen($snapshot->blocks['B2']['content']) + 23, $snapshot->totalSize());
+    }
+
+    public function test_content_too_long_to_show_is_cut_and_marked(): void
+    {
+        $snapshot = (new ProseExtractor)->extract([$this->node('CodeBlock', ['code' => str_repeat('x', ProseExtractor::MAX_CONTENT)])]);
+
+        $this->assertTrue($snapshot->blocks['B1']['truncated']);
+        $this->assertSame(ProseExtractor::MAX_CONTENT + 1, mb_strlen($snapshot->blocks['B1']['content']));
+        $this->assertStringEndsWith('…', $snapshot->blocks['B1']['content']);
     }
 
     public function test_it_finds_blocks_by_id_and_lists_every_version_in_a_subtree(): void

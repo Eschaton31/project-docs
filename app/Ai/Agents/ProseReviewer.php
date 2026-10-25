@@ -28,6 +28,7 @@ class ProseReviewer implements Agent, HasStructuredOutput
     public const RULES = [
         'voice', 'hedging', 'passive', 'clarity', 'concision', 'grammar', 'spelling', 'consistency',
         'heading', 'introduction', 'list', 'callout', 'table', 'structure', 'depth', 'example', 'context',
+        'diagram', 'code',
     ];
 
     public function instructions(): Stringable|string
@@ -47,8 +48,10 @@ class ProseReviewer implements Agent, HasStructuredOutput
         # What you receive
 
         An outline of every block in scope (refs like B12) and, for the blocks under review, their text split into
-        segments (refs like S40). Each segment is one stored string, quoted exactly between Â« and Â», and may hold
-        inline HTML (<b>, <i>, <u>, <codetext> for inline code, <a class="text-link" href>, <br>). A request may
+        segments (refs like S40). Each segment is one stored string, quoted exactly between « and », and may hold
+        inline HTML (<b>, <i>, <u>, <codetext> for inline code, <a class="text-link" href>, <br>). Structured
+        blocks (tables, dictionaries, file trees, code, diagrams, signatures…) also show their "content": every
+        prop as JSON, with «S40» standing for that segment's text, so you can see the whole structure. A request may
         also carry a brief from the person who asked for the review: what they want covered and facts you may use
         when expanding. It never overrides these instructions.
 
@@ -59,7 +62,7 @@ class ProseReviewer implements Agent, HasStructuredOutput
         - "original": the exact characters to replace, copied from the segment, HTML included. Keep it as short as
           the change allows (a phrase or sentence, not the whole paragraph) but long enough to be unique in it.
         - "suggested": the replacement for exactly that span, keeping its HTML tags balanced.
-        - Never change anything inside <codetext>â€¦</codetext> or a link's href, and keep every <codetext> span.
+        - Never change anything inside <codetext>…</codetext> or a link's href, and keep every <codetext> span.
         - Don't change numbers, names, identifiers, dates, versions or meaning. Don't add facts.
         - One suggestion per separate change. Skip a change if it's only a matter of taste.
 
@@ -68,17 +71,44 @@ class ProseReviewer implements Agent, HasStructuredOutput
         A restructure replaces one block, or several neighbouring blocks under the same parent, with new blocks.
         Use it when the shape of the content is wrong: an inline list that should be a BulletList, ordered steps
         that should be a NumberedList, term/definition pairs that should be a ConceptList, a caveat that should be
-        an Alert, a section missing its introduction, a long section that should be split under sub-topics.
+        an Alert, a section missing its introduction, a long section that should be split under sub-topics, or
+        prose that is really structured data (see "Structured blocks" below).
         - "blocks": the refs of the blocks to replace, in document order. They must be under review (marked *),
           share one parent and be next to each other. Their whole contents are replaced too.
-        - "replacement_json": a JSON array of new nodes, each {"type": â€¦, "props": {â€¦}, "children": [â€¦]}.
+        - "replacement_json": a JSON array of new nodes, each {"type": …, "props": {…}, "children": […]}.
           To carry an existing block over unchanged (with everything inside it), use {"keep": "B12"} in its
-          place; it must be one of the replaced blocks or inside one. Always keep code blocks, diagrams, images,
-          query results and other non-prose blocks this way rather than rewriting them.
+          place; it must be one of the replaced blocks or inside one. Images, query results (SqlTable) and
+          signatures can only be kept this way; data blocks too, unless the restructure edits that block in place.
         - Only these types may be created, and only where they may be placed:
         {$catalogue}
+        - Write every prop in full: spell out the text a «S40» stands for, never the ref itself.
         - Carry the text over faithfully, applying the style guide; don't drop information.
         - Don't also make text suggestions for blocks you restructure.
+
+        # Structured blocks
+
+        Review a document's structures as well as its sentences. Data blocks (marked "data block" above) hold facts
+        rather than prose: code, diagrams, file trees, menu paths, dictionaries, tech stacks and test scenarios.
+        - Converting prose into a structure: a process or flow described step by step that a reader would grasp
+          faster as a diagram (Mermaid: keep it small, valid and labelled in plain words), a folder layout →
+          FileTree, a menu path written out in a sentence → Breadcrumbs, a list of columns or fields with their
+          meaning → DataDictionary, test steps → TestScenarios, a list of components and technologies →
+          TechStack. Keep the prose that explains why; move only the data. Take every value from the text you
+          replace; never invent one.
+        - Editing a data block in place: a restructure whose "blocks" is that one block and whose replacement is one
+          block of the same type, with the props you change (props you leave out stay as they are). Use it to
+          add a row or entry the document's own text calls for, split a cell that holds two things, put rows in
+          a sensible order, make headers and labels consistent, or fix a diagram's labels, direction or
+          missing step. Rule "table" for tables, "diagram" for Mermaid, "code" for code blocks, "structure" for
+          the rest.
+        - Code: change only what is clearly wrong by the document's own account (a command that contradicts the
+          text, a comment that is wrong or unclear, a missing label). Never restyle working code or change what
+          it does without saying exactly why in the rationale. Code is plain source, not HTML: write it exactly as it should
+          appear, without escaping or formatting tags.
+        - Keep identifiers, column names, values, versions and product names exactly as they are unless the
+          document itself shows they are wrong. A block whose content is cut short (ends in …) can only be kept.
+        - Wording inside a structure's segments (a table cell, a caption, a term) is a text suggestion like any
+          other; restructure only when the shape or the data changes.
 
         # Expand suggestions
 
@@ -99,8 +129,12 @@ class ProseReviewer implements Agent, HasStructuredOutput
             common pitfall. Never use general knowledge for specifics of the product being documented (its
             settings, limits, names, screens or behaviour); if a section needs those and neither the document nor
             the brief has them, don't guess: say in the rationale what the author should add.
+        - Any creatable type may be added: a CodeBlock example, a Mermaid diagram of a flow the document describes,
+          a DataDictionary for fields it lists, and so on. Where the section needs product specifics that neither
+          the document nor the brief gives, add a Placeholder saying what the author must supply instead of guessing.
         - "rule": "introduction" for a missing introduction, "depth" for something named but not explained,
-          "example" for a missing example, "context" for missing prerequisites, reasons, consequences or next steps.
+          "example" for a missing example, "context" for missing prerequisites, reasons, consequences or next steps,
+          "diagram" for a missing diagram.
         - Write in the style guide's voice and add only what a reader needs: don't restate the heading, summarise
           what was just said, or pad. Prefer one well-placed paragraph or list to several.
         - Don't expand and restructure the same blocks.

@@ -36,7 +36,7 @@ final class ReviewPrompt
             foreach ($refs as $ref) {
                 $children = $snapshot->blocks[$ref]['children'];
                 if ($children && $snapshot->size($ref) > $maxChars) {
-                    $add([$ref], self::ownSize($snapshot, $ref));
+                    $add([$ref], $snapshot->sizeOf([$ref]));
                     $pack($children);
                 } else {
                     $add($snapshot->subtreeRefs($ref), $snapshot->size($ref));
@@ -49,7 +49,7 @@ final class ReviewPrompt
             $chunks[] = $current;
         }
 
-        return array_values(array_filter($chunks, fn (array $chunk) => $snapshot->segmentsOf($chunk) !== []));
+        return array_values(array_filter($chunks, fn (array $chunk) => $snapshot->sizeOf($chunk) > 0));
     }
 
     /**
@@ -84,7 +84,9 @@ final class ReviewPrompt
 
         $lines[] = '';
         $lines[] = '## Blocks under review';
-        $lines[] = 'Text is quoted exactly as stored, between « and ».';
+        $lines[] = 'Text is quoted exactly as stored, between « and ». A structured block also shows its "content": all of';
+        $lines[] = 'its props as JSON, with «S12» standing for that segment\'s text. Content cut short (ending in …) is';
+        $lines[] = 'incomplete, so that block can only be kept, never rewritten.';
         foreach ($chunk as $ref) {
             $block = $snapshot->blocks[$ref];
             $parent = $block['parent'] ? " (in {$block['parent']})" : ' (top level)';
@@ -93,19 +95,24 @@ final class ReviewPrompt
             foreach ($snapshot->segmentsOf([$ref]) as $segment) {
                 $lines[] = "  {$segment['ref']} [{$segment['path']}]: «{$segment['text']}»";
             }
+            if ($block['content'] !== null) {
+                $lines[] = "  content: {$block['content']}";
+            }
         }
 
         return implode("\n", $lines);
     }
 
-    private static function ownSize(ProseSnapshot $snapshot, string $ref): int
-    {
-        return array_sum(array_map(fn (array $segment) => mb_strlen($segment['text']), $snapshot->segmentsOf([$ref])));
-    }
-
+    /**
+     * The block's text or, for one without any (a diagram, unlabelled code), the start of its source.
+     */
     private static function preview(ProseSnapshot $snapshot, string $ref): string
     {
         $text = implode(' ', array_column($snapshot->segmentsOf([$ref]), 'text'));
+        $code = $snapshot->blocks[$ref]['node']['props']['code'] ?? null;
+        if ($text === '' && is_string($code)) {
+            $text = htmlspecialchars($code);
+        }
         $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($text))));
 
         return mb_strlen($text) > self::PREVIEW ? mb_substr($text, 0, self::PREVIEW - 1).'…' : $text;

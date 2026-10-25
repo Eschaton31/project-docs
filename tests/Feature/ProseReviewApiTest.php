@@ -145,13 +145,13 @@ class ProseReviewApiTest extends TestCase
     {
         $other = Document::where('slug', $this->postJson('/api/documents', ['title' => 'Other'])->json('document.slug'))->firstOrFail();
         [$foreign] = $this->postJson("/api/documents/{$other->slug}/blocks/tree", ['blocks' => [['type' => 'PrimaryTopic', 'props' => ['title' => 'X']]]])->json('blocks');
-        [$code] = $this->postJson("/api/documents/{$this->document->slug}/blocks/tree", [
+        [$empty] = $this->postJson("/api/documents/{$this->document->slug}/blocks/tree", [
             'parentId' => $this->topic['id'],
-            'blocks' => [['type' => 'CodeBlock', 'props' => ['code' => 'SELECT 1;']]],
+            'blocks' => [['type' => 'Paragraph', 'props' => []]],
         ])->json('blocks');
 
         $this->postJson("/api/documents/{$this->document->slug}/reviews", ['blockId' => $foreign['id']])->assertJsonValidationErrors('blockId');
-        $this->postJson("/api/documents/{$this->document->slug}/reviews", ['blockId' => $code['id']])->assertJsonValidationErrors('blockId');
+        $this->postJson("/api/documents/{$this->document->slug}/reviews", ['blockId' => $empty['id']])->assertJsonValidationErrors('blockId');
         $this->postJson("/api/documents/{$this->document->slug}/reviews", ['model' => 'gpt'])->assertJsonValidationErrors('model');
         $this->postJson("/api/documents/{$this->document->slug}/reviews", ['kinds' => ['tone']])->assertJsonValidationErrors('kinds.0');
         ProseReviewer::assertNeverPrompted();

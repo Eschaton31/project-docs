@@ -13,6 +13,10 @@
     "props": ["type", "title"],
     "shape": "{\"type\": \"info|warn|success|error\", \"title\": \"Note\"} (its text goes in one RichText child)"
   },
+  "Placeholder": {
+    "props": ["text"],
+    "shape": "{\"text\": \"to be written: what the author must add\"} (marks content only the author can supply)"
+  },
   "BulletList": {
     "props": ["list", "bold"],
     "shape": "{\"list\": [\"Item\", [\"Sub-item of the item before\"], \"Item\"]} (items may hold inline HTML)"
@@ -26,5 +30,47 @@
   "ItemDescriptionTable": {
     "props": ["itemName", "descriptionName", "data", "mono", "left", "widths"],
     "shape": "{\"itemName\": \"Item\", \"descriptionName\": \"Description\", \"data\": [{\"item\": \"Item\", \"description\": \"Description\"}]}"
+  },
+  "CodeBlock": {
+    "props": ["lang", "label", "code"],
+    "shape": "{\"lang\": \"sql|php|r|bash|json|javascript|…\", \"label\": \"Optional caption\", \"code\": \"Plain source code\"}",
+    "data": true,
+    "raw": ["code"]
+  },
+  "Mermaid": {
+    "props": ["code"],
+    "shape": "{\"code\": \"Mermaid source, e.g. flowchart LR\\n  A[Upload] --> B[Validate]\"}",
+    "data": true,
+    "raw": ["code"]
+  },
+  "FileTree": {
+    "props": ["list", "description"],
+    "shape": "{\"list\": [{\"type\": \"folder|file|…\", \"name\": \"src\", \"note\": \"Optional note\", \"children\": [same shape]}], \"description\": \"Caption\"}",
+    "data": true
+  },
+  "Breadcrumbs": {
+    "props": ["list"],
+    "shape": "{\"list\": [\"Menu\", \"Submenu\", \"Screen\"]} (a path through the product's menus)",
+    "data": true
+  },
+  "ConversionDictionary": {
+    "props": ["data", "mono", "widths"],
+    "shape": "{\"data\": [{\"item\": \"variable\", \"description\": \"Description\", \"formats\": \"Format\"}]}",
+    "data": true
+  },
+  "DataDictionary": {
+    "props": ["data"],
+    "shape": "{\"data\": [{\"field\": \"column_name\", \"description\": \"Description\", \"type\": \"VARCHAR\", \"values\": \"Possible values\"}]}",
+    "data": true
+  },
+  "TechStack": {
+    "props": ["data"],
+    "shape": "{\"data\": [{\"component\": \"Component\", \"tech\": \"Technology\", \"framework\": \"Framework\"}]}",
+    "data": true
+  },
+  "TestScenarios": {
+    "props": ["data"],
+    "shape": "{\"data\": [{\"functionality\": \"Functionality\", \"details\": \"Detail\", \"remarks\": \"\"}]} (neighbouring rows with the same functionality form one group)",
+    "data": true
   }
 }

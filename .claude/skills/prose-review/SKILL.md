@@ -20,8 +20,9 @@ Run, passing the arguments through:
 php artisan prose-review:export <document-slug> [--block=<id>] [--kinds=...] [--brief-file=<path>]
 ```
 
-- `--kinds` is any of `text` (wording), `restructure` (block structure) and `expand` (add missing content),
-  comma separated; without it, text and restructure.
+- `--kinds` is any of `text` (wording), `restructure` (block structure, including converting prose into tables,
+  diagrams, file trees and the like, and editing those structures in place) and `expand` (add missing content,
+  any block type), comma separated; without it, text and restructure.
 - **Brief.** Everything after `--brief:` in the arguments is the admin's brief: what to cover when expanding, and
   facts the reviewer may use. Never put it in a shell command. Write it, word for word, to
   `storage/app/prose-reviews/brief.txt` with your file-writing tool and pass `--brief-file=storage/app/prose-reviews/brief.txt`.

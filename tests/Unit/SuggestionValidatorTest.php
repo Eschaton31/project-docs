@@ -139,6 +139,59 @@ class SuggestionValidatorTest extends TestCase
         $this->assertCount(1, $this->validate(restructure: [$this->restructure(['B4', 'B6'], $replacement)]));
     }
 
+    public function test_a_data_block_can_be_edited_in_place_keeping_the_props_it_leaves_out(): void
+    {
+        $replacement = [['type' => 'CodeBlock', 'props' => ['code' => "<?php\n// install without dev tools\ncomposer install --no-dev"]]];
+
+        [$saved] = $this->validate(restructure: [$this->restructure(['B6'], $replacement)]);
+
+        $this->assertSame([$this->id('B6')], $saved['block_ids']);
+        // code is plain source, so its tags are not checked as HTML; the language carries over
+        $this->assertSame(['code' => "<?php\n// install without dev tools\ncomposer install --no-dev", 'lang' => 'bash'], $saved['replacement'][0]['props']);
+    }
+
+    public function test_data_blocks_are_only_rewritten_as_themselves(): void
+    {
+        $cases = [
+            'unchanged' => [['B6'], [['type' => 'CodeBlock', 'props' => ['code' => 'composer install']]]],
+            'into prose' => [['B6'], [['type' => 'BulletList', 'props' => ['list' => ['composer install']]]]],
+            'together with its neighbour' => [['B4', 'B6'], [['keep' => 'B4'], ['type' => 'CodeBlock', 'props' => ['code' => 'composer update']]]],
+            'html in a prop that is not code' => [['B6'], [['type' => 'CodeBlock', 'props' => ['label' => '<img src=x>']]]],
+            'code that is not a string' => [['B6'], [['type' => 'CodeBlock', 'props' => ['code' => ['composer']]]]],
+        ];
+        $this->chunk = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'];
+
+        foreach ($cases as $case => [$blocks, $replacement]) {
+            $this->assertSame([], $this->validate(restructure: [$this->restructure($blocks, $replacement)]), $case);
+        }
+    }
+
+    public function test_a_data_block_shown_only_in_part_cannot_be_rewritten(): void
+    {
+        $this->snapshot = (new ProseExtractor)->extract([$this->node('CodeBlock', ['code' => str_repeat('x', ProseExtractor::MAX_CONTENT)])]);
+        $this->chunk = ['B1'];
+
+        $this->assertSame([], $this->validate(restructure: [$this->restructure(['B1'], [['type' => 'CodeBlock', 'props' => ['code' => 'y']]])]));
+    }
+
+    public function test_prose_can_become_a_structure_but_not_with_segment_refs_or_malformed_rows(): void
+    {
+        $dictionary = fn (mixed $data) => [['type' => 'DataDictionary', 'props' => ['data' => $data]]];
+        $this->chunk = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'];
+
+        $this->assertCount(1, $this->validate(restructure: [$this->restructure(['B2'], $dictionary([['field' => 'php', 'description' => 'The runtime', 'type' => 'VARCHAR', 'values' => '']]))]));
+        $this->assertSame([], $this->validate(restructure: [$this->restructure(['B2'], $dictionary([['field' => 'php', 'description' => '«S2»']]))]), 'segment ref');
+        $this->assertSame([], $this->validate(restructure: [$this->restructure(['B2'], $dictionary('php: the runtime'))]), 'rows not a list');
+    }
+
+    public function test_an_expansion_can_add_a_diagram_or_a_placeholder(): void
+    {
+        $diagram = ['type' => 'Mermaid', 'props' => ['code' => "flowchart LR\n  A[Install] --> B[Run]"]];
+        $placeholder = ['type' => 'Placeholder', 'props' => ['text' => 'to be written: the supported PHP versions']];
+
+        $this->assertCount(2, $this->validate(expand: [$this->expand('B6', 'after', [$diagram]), $this->expand('B6', 'after', [$placeholder])]));
+    }
+
     public function test_restructures_are_dropped_when_not_requested(): void
     {
         $replacement = [['type' => 'BulletList', 'props' => ['list' => ['PHP']]]];

@@ -6,11 +6,21 @@ namespace App\Ai;
  * Reads the reviewable text out of a block tree (the nested nodes DocumentTree builds).
  *
  * Text is kept exactly as stored, inline HTML included, so a suggestion's "original" can be matched against
- * the block and replaced without converting anything. Code, diagrams, query results, product names and UI
- * labels (breadcrumbs) are not reviewed.
+ * the block and replaced without converting anything. Code, diagrams, query results, product names, people's
+ * names and UI labels (breadcrumbs) are not reviewed as text; structured blocks carry them as read-only content
+ * instead, so a restructure can see (and rewrite) the whole block.
  */
 final class ProseExtractor
 {
+    /** Types whose props are fully shown by their segments and flags, so they carry no content. */
+    private const PLAIN = [
+        'PrimaryTopic', 'SecondaryTopic', 'TertiaryTopic', 'QuaternaryTopic', 'Paragraph', 'RichText',
+        'TertiaryTitle', 'Placeholder', 'Alert', 'BulletList', 'NumberedList',
+    ];
+
+    /** Longest content shown in full; a longer one is cut and its block can only be kept. */
+    public const MAX_CONTENT = 4000;
+
     /**
      * Where each type keeps its prose:
      *   key               a string prop
@@ -28,17 +38,20 @@ final class ProseExtractor
         'Placeholder' => ['text'],
         'RichText' => ['html'],
         'Alert' => ['title'],
+        'Signature' => ['label', 'designation'],
         'BulletList' => ['list*'],
         'NumberedList' => ['list*'],
-        'ConceptList' => ['list~value'],
+        'ConceptList' => ['list~id!highlight', 'list~value'],
         'FileTree' => ['description', 'list~note'],
         'Image' => ['description'],
         'SqlTable' => ['description'],
         'CodeBlock' => ['label'],
         'ItemDescriptionTable' => ['itemName', 'descriptionName', 'data[].description', 'data[].item!mono'],
-        'KeyValueTable' => ['table[].value'],
+        'KeyValueTable' => ['table[].id', 'table[].value'],
         'ConversionDictionary' => ['data[].description'],
         'DataDictionary' => ['data[].description'],
+        'TechStack' => ['data[].component'],
+        // not functionality: neighbouring rows sharing it form one group, so it only changes by restructure
         'TestScenarios' => ['data[].details', 'data[].remarks'],
     ];
 
@@ -70,11 +83,21 @@ final class ProseExtractor
             'version' => $node['version'] ?? 1,
             'children' => [],
             'node' => ['type' => $node['type'], 'props' => $props, 'options' => (array) ($node['options'] ?? [])],
+            'content' => null,
+            'truncated' => false,
         ];
 
+        $marked = $props;
         foreach ($this->texts($node['type'], $props) as $path => $text) {
             $segment = 'S'.(count($this->segments) + 1);
             $this->segments[$segment] = ['ref' => $segment, 'block' => $ref, 'field' => explode('.', $path)[0], 'path' => $path, 'text' => $text];
+            $marked = PropPath::set($marked, $path, "«{$segment}»");
+        }
+
+        if (! in_array($node['type'], self::PLAIN, true) && $props !== []) {
+            $content = json_encode($marked, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $this->blocks[$ref]['truncated'] = mb_strlen($content) > self::MAX_CONTENT;
+            $this->blocks[$ref]['content'] = $this->blocks[$ref]['truncated'] ? mb_substr($content, 0, self::MAX_CONTENT).'…' : $content;
         }
 
         foreach ($node['children'] ?? [] as $child) {
