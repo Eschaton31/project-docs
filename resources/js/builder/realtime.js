@@ -5,16 +5,20 @@ import { http } from './api.js'
 
 let echo = null
 
+// `composer dev` serves every address, so connect to Reverb wherever the page was opened:
+// over the cloudflared tunnel that's wss on 443 (it routes /app/ to Reverb), directly it's the Reverb port
+const fromPage = import.meta.env.VITE_REVERB_FROM_PAGE === 'true'
+
 /** One Reverb connection per tab, opened on first use. */
 function connection() {
   echo ??= new Echo({
     broadcaster: 'reverb',
     Pusher,
     key: import.meta.env.VITE_REVERB_APP_KEY,
-    wsHost: import.meta.env.VITE_REVERB_HOST,
+    wsHost: fromPage ? location.hostname : import.meta.env.VITE_REVERB_HOST,
     wsPort: Number(import.meta.env.VITE_REVERB_PORT ?? 80),
-    wssPort: Number(import.meta.env.VITE_REVERB_PORT ?? 443),
-    forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
+    wssPort: fromPage ? Number(location.port || 443) : Number(import.meta.env.VITE_REVERB_PORT ?? 443),
+    forceTLS: fromPage ? location.protocol === 'https:' : (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
     enabledTransports: ['ws', 'wss'],
     // authorise channels with the session cookie, like every other request
     channelAuthorization: {

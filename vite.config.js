@@ -4,7 +4,9 @@ import { URL, fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // the dev server lives under /vite-dev/ so the cloudflared tunnel can route that path to it (app/Support/DevServerVite.php)
+  base: command === 'serve' ? '/vite-dev/' : undefined,
   plugins: [
     laravel({
       input: ['resources/js/main.js'],
@@ -26,10 +28,11 @@ export default defineConfig({
     },
   },
   server: {
-    // `composer dev` listens on 0.0.0.0; advertise the LAN IP in public/hot and for HMR instead
-    hmr: process.env.VITE_HMR_HOST ? { host: process.env.VITE_HMR_HOST } : undefined,
+    // pages opened on any address load scripts from here; IPs and localhost are allowed hosts by default
+    cors: true,
+    allowedHosts: ['.bene-server.com'],
     watch: {
       ignored: ['**/storage/framework/views/**', '**/vendor/**'],
     },
   },
-})
+}))

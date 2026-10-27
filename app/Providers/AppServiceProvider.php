@@ -8,8 +8,10 @@ use App\Ai\Reviewers\ClaudeCodeReviewer;
 use App\Models\User;
 use App\Pdf\BrowsershotRenderer;
 use App\Pdf\PdfRenderer;
+use App\Support\DevServerVite;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Foundation\Vite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -24,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PdfRenderer::class, fn () => new BrowsershotRenderer(config('services.pdf')));
+        $this->app->singleton(Vite::class, DevServerVite::class);
         $this->app->bind(ChunkReviewer::class, fn () => config('ai-review.runner') === 'api' ? new ApiReviewer : new ClaudeCodeReviewer);
     }
 
@@ -54,7 +57,8 @@ class AppServiceProvider extends ServiceProvider
         $ip = $this->hostIp();
         $port = parse_url(config('app.url'), PHP_URL_PORT) ?: 8000;
 
-        foreach (['APP_URL' => "http://{$ip}:{$port}", 'REVERB_HOST' => $ip, 'VITE_REVERB_HOST' => $ip, 'VITE_HMR_HOST' => $ip] as $key => $value) {
+        // the browser reaches Reverb wherever it opened the page (resources/js/builder/realtime.js)
+        foreach (['APP_URL' => "http://{$ip}:{$port}", 'REVERB_HOST' => $ip, 'VITE_REVERB_FROM_PAGE' => 'true'] as $key => $value) {
             putenv("{$key}={$value}");
             $_ENV[$key] = $_SERVER[$key] = $value;
         }
