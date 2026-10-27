@@ -26,6 +26,8 @@ export default defineConfig({
     },
   },
   server: {
+    // `composer dev` listens on 0.0.0.0; advertise the LAN IP in public/hot and for HMR instead
+    hmr: process.env.VITE_HMR_HOST ? { host: process.env.VITE_HMR_HOST } : undefined,
     watch: {
       ignored: ['**/storage/framework/views/**', '**/vendor/**'],
     },

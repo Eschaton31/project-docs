@@ -45,7 +45,8 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Runs `composer dev` on this machine's LAN IP instead of localhost, so other devices can open it.
+     * Runs `composer dev` on every network interface instead of only localhost, so other devices can open it.
+     * The servers listen on 0.0.0.0 while URLs advertise this machine's LAN IP (browsers can't connect to 0.0.0.0).
      * The URLs are handed to every dev process as environment variables, which take precedence over .env.
      */
     private function serveOnHostIp(): void
@@ -53,13 +54,13 @@ class AppServiceProvider extends ServiceProvider
         $ip = $this->hostIp();
         $port = parse_url(config('app.url'), PHP_URL_PORT) ?: 8000;
 
-        foreach (['APP_URL' => "http://{$ip}:{$port}", 'REVERB_HOST' => $ip, 'VITE_REVERB_HOST' => $ip] as $key => $value) {
+        foreach (['APP_URL' => "http://{$ip}:{$port}", 'REVERB_HOST' => $ip, 'VITE_REVERB_HOST' => $ip, 'VITE_HMR_HOST' => $ip] as $key => $value) {
             putenv("{$key}={$value}");
             $_ENV[$key] = $_SERVER[$key] = $value;
         }
 
-        DevCommands::artisan("serve --host={$ip} --port={$port}", 'server');
-        DevCommands::node("dev -- --host {$ip}", 'vite');
+        DevCommands::artisan("serve --host=0.0.0.0 --port={$port}", 'server');
+        DevCommands::node('dev -- --host 0.0.0.0', 'vite');
     }
 
     /**
