@@ -22,6 +22,11 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
+  build: {
+    // browsers that visited on 2026-10-27 cached a permanent (308) self-redirect for /build/assets/* URLs;
+    // a new directory gives every chunk a URL they've never seen. Bump it again if that ever recurs.
+    assetsDir: 'chunks',
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
