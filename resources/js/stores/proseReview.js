@@ -32,6 +32,8 @@ export const useProseReviewStore = defineStore('proseReview', () => {
   const runner = ref('api')
   // whether this user's Review button starts one (with Claude Code: only the plan's owner)
   const canStart = ref(true)
+  // after uploading scripts that wait for Claude Code: the /doc-scaffold command to run there
+  const scaffoldCommand = ref(null)
 
   let documentSlug = null
   let documentId = null
@@ -92,6 +94,39 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     }
   }
 
+  /**
+   * Uploads R scripts to draft documentation from. form: FormData with files[], paths[], entry, runNotes,
+   * blockId, model. Without the editor runner the upload waits for Claude Code, and `command` says what to run.
+   */
+  async function startScaffold(slug, form) {
+    starting.value = true
+    error.value = null
+    scaffoldCommand.value = null
+    try {
+      await useEditorStore().flushAll()
+      const { data } = await http.post(`/api/documents/${slug}/scaffolds`, form)
+      review.value = data.review
+      scaffoldCommand.value = data.command
+      suggestions.value = []
+      await refresh()
+
+      return true
+    } catch (e) {
+      error.value = errorMessage(e)
+
+      return false
+    } finally {
+      starting.value = false
+    }
+  }
+
+  /** One uploaded script of the current scaffold, as stored (secrets redacted). */
+  async function sourceText(sourceId) {
+    const { data } = await http.get(`/api/reviews/${review.value.id}/sources/${sourceId}`)
+
+    return data.text
+  }
+
   async function refresh() {
     clearTimeout(pollTimer)
     if (!review.value) return
@@ -131,15 +166,24 @@ export const useProseReviewStore = defineStore('proseReview', () => {
 
   /** Accepts every pending wording suggestion for one rule. */
   async function acceptRule(rule) {
+    await acceptMany(`/api/reviews/${review.value.id}/accept-rule`, { rule })
+  }
+
+  /** Accepts every pending suggestion of a scaffold, in the template's order. */
+  async function acceptAll() {
+    await acceptMany(`/api/reviews/${review.value.id}/accept-all`, {})
+  }
+
+  async function acceptMany(url, payload) {
     error.value = notice.value = null
     try {
       const editor = useEditorStore()
       await editor.flushAll()
-      const { data } = await http.post(`/api/reviews/${review.value.id}/accept-rule`, { rule })
+      const { data } = await http.post(url, payload)
       data.changes.forEach(editor.applyChange)
       suggestions.value = data.suggestions
       const skipped = [
-        data.stale && `${data.stale} no longer matched the text`,
+        data.stale && `${data.stale} no longer matched the document`,
         data.locked && `${data.locked} were on blocks someone is editing`,
       ].filter(Boolean)
       notice.value = `Accepted ${data.accepted}${skipped.length ? `; skipped ${skipped.join(' and ')}` : ''}.`
@@ -177,6 +221,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     documentId = documentSlug = null
     runner.value = 'api'
     canStart.value = true
+    scaffoldCommand.value = null
     review.value = null
     suggestions.value = []
     slow.value = false
@@ -196,14 +241,18 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     busy,
     runner,
     canStart,
+    scaffoldCommand,
     openPanel,
     load,
     showLatest,
     start,
+    startScaffold,
+    sourceText,
     refresh,
     accept,
     dismiss,
     acceptRule,
+    acceptAll,
     reset,
   }
 })
