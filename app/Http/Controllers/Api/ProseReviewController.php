@@ -31,6 +31,8 @@ class ProseReviewController extends Controller
             'runner' => config('ai-review.runner'),
             // otherwise the editor shows the /prose-review command to run in Claude Code
             'canStart' => $request->user()->canStartAiReviews(),
+            // read when the panel opens, so a tab signed in before the feature was turned on still offers it
+            'canScaffold' => (bool) config('ai-review.scaffold.enabled'),
         ]);
     }
 

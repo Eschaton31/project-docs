@@ -168,9 +168,11 @@ class ProseScaffoldApiTest extends TestCase
     public function test_the_feature_can_be_turned_off(): void
     {
         $this->getJson('/api/user')->assertJsonPath('abilities.aiScaffold', true);
+        $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('canScaffold', true);
 
         config(['ai-review.scaffold.enabled' => false]);
         $this->getJson('/api/user')->assertJsonPath('abilities.aiScaffold', false);
+        $this->getJson("/api/documents/{$this->document->slug}/reviews")->assertJsonPath('canScaffold', false);
         $this->post("/api/documents/{$this->document->slug}/scaffolds", ['files' => [UploadedFile::fake()->createWithContent('a.R', 'x')]], ['Accept' => 'application/json'])->assertNotFound();
     }
 

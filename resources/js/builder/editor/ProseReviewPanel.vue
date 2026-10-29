@@ -24,7 +24,8 @@ const editor = useEditorStore()
 const reviews = useProseReviewStore()
 const auth = useAuthStore()
 
-const canScaffold = computed(() => !!auth.user?.abilities?.aiScaffold)
+// the server's answer when the panel loads; the signed-in user's abilities until then (they can predate the feature)
+const canScaffold = computed(() => reviews.canScaffold ?? !!auth.user?.abilities?.aiScaffold)
 // review the document's prose, or draft documentation from R scripts
 const mode = ref(reviews.review?.mode === 'scaffold' && canScaffold.value ? 'scaffold' : 'review')
 const isScaffold = computed(() => reviews.review?.mode === 'scaffold')

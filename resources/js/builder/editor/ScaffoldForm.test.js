@@ -142,6 +142,27 @@ describe('Scaffold from code', () => {
     expect(wrapper.find('[data-scaffold-form]').exists()).toBe(false)
   })
 
+  it('follows the server when the panel loads, not abilities from a sign-in before the feature existed', async () => {
+    const list = http.get.getMockImplementation()
+    const withFlag = (canScaffold) => async (url) =>
+      url === '/api/documents/doc/reviews'
+        ? { data: { runner: 'api', canStart: true, canScaffold, reviews: [] } }
+        : list(url)
+
+    useAuthStore().user = { id: 1, abilities: { aiReview: true } }
+    http.get.mockImplementation(withFlag(true))
+    const offered = await mountPanel()
+    expect(offered.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Review', 'Scaffold from code'])
+    offered.unmount()
+
+    setActivePinia(createPinia())
+    await useEditorStore().load('doc')
+    useAuthStore().user = { id: 1, abilities: { aiReview: true, aiScaffold: true } }
+    http.get.mockImplementation(withFlag(false))
+    const off = await mountPanel()
+    expect(off.find('[role="tab"]').exists()).toBe(false)
+  })
+
   it('takes .R files only, defaults the script opened first, and uploads them with the run notes', async () => {
     const wrapper = await mountPanel()
     await openScaffold(wrapper)

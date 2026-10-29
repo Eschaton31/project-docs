@@ -34,6 +34,8 @@ export const useProseReviewStore = defineStore('proseReview', () => {
   const canStart = ref(true)
   // after uploading scripts that wait for Claude Code: the /doc-scaffold command to run there
   const scaffoldCommand = ref(null)
+  // whether drafting from R scripts is on, as the server says when the panel loads (null until then)
+  const canScaffold = ref(null)
 
   let documentSlug = null
   let documentId = null
@@ -68,6 +70,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
       const { data } = await http.get(`/api/documents/${documentSlug}/reviews`)
       runner.value = data.runner ?? 'api'
       canStart.value = data.canStart ?? runner.value === 'api'
+      canScaffold.value = data.canScaffold ?? null
       if (data.reviews[0]) {
         review.value = data.reviews[0]
         await refresh()
@@ -222,6 +225,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     runner.value = 'api'
     canStart.value = true
     scaffoldCommand.value = null
+    canScaffold.value = null
     review.value = null
     suggestions.value = []
     slow.value = false
@@ -242,6 +246,7 @@ export const useProseReviewStore = defineStore('proseReview', () => {
     runner,
     canStart,
     scaffoldCommand,
+    canScaffold,
     openPanel,
     load,
     showLatest,
