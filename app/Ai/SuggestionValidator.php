@@ -170,19 +170,7 @@ final class SuggestionValidator
         $sources = array_values(array_unique((array) ($suggestion['sources'] ?? [])));
         $this->assert($sources !== [] && array_diff($sources, ProseSuggestion::SOURCES) === [], 'unknown sources');
 
-        $nodes = json_decode((string) ($suggestion['blocks_json'] ?? ''), true);
-        $this->assert(is_array($nodes) && $nodes !== [] && array_is_list($nodes), 'replacement is not a list of nodes');
-        $none = [];
-        // with nothing replaced, any {"keep": …} is refused
-        $nodes = $this->resolveAll($nodes, [], $none);
-
-        $parentType = $parent === null ? null : $this->snapshot->blocks[$parent]['type'];
-        try {
-            app(DocumentTree::class)->assertValidNodes($nodes, $parentType);
-        } catch (ValidationException) {
-            throw new Rejected('replacement breaks nesting rules');
-        }
-
+        $nodes = $this->newNodes($suggestion['blocks_json'] ?? '', $parent === null ? null : $this->snapshot->blocks[$parent]['type']);
         $block = $this->snapshot->blocks[$anchor];
 
         return [
@@ -195,6 +183,30 @@ final class SuggestionValidator
             'position' => $position,
             'sources' => $sources,
         ];
+    }
+
+    /**
+     * New blocks from a JSON string of nodes, checked against the catalogue and the nesting rules for a parent of
+     * $parentType (null = the document root). Nothing existing can be kept: any {"keep": …} is refused.
+     *
+     * @return list<array> nodes ready for insertTree
+     *
+     * @throws Rejected
+     */
+    public function newNodes(mixed $json, ?string $parentType): array
+    {
+        $nodes = json_decode((string) $json, true);
+        $this->assert(is_array($nodes) && $nodes !== [] && array_is_list($nodes), 'replacement is not a list of nodes');
+        $none = [];
+        $nodes = $this->resolveAll($nodes, [], $none);
+
+        try {
+            app(DocumentTree::class)->assertValidNodes($nodes, $parentType);
+        } catch (ValidationException) {
+            throw new Rejected('replacement breaks nesting rules');
+        }
+
+        return $nodes;
     }
 
     /**

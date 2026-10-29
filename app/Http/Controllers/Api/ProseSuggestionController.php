@@ -47,4 +47,21 @@ class ProseSuggestionController extends Controller
             'suggestions' => $review->suggestions()->orderBy('id')->get()->map->toSummary(),
         ]);
     }
+
+    /**
+     * Every pending suggestion of a scaffold, in the template's order.
+     */
+    public function acceptAll(Request $request, ProseReview $review): JsonResponse
+    {
+        abort_unless($review->isScaffold(), 404);
+        $result = $this->reviews->acceptAll($review, $request->user());
+
+        return response()->json([
+            'accepted' => $result['accepted'],
+            'stale' => $result['stale'],
+            'locked' => $result['locked'],
+            'changes' => array_map(fn (Revision $revision) => $revision->toEvent(), $result['revisions']),
+            'suggestions' => $review->suggestions()->orderBy('id')->get()->map->toSummary(),
+        ]);
+    }
 }

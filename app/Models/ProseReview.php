@@ -8,10 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['document_id', 'scope_block_id', 'requested_by', 'model', 'kinds', 'brief', 'status', 'error', 'document_seq', 'snapshot', 'input_tokens', 'output_tokens'])]
+#[Fillable(['document_id', 'scope_block_id', 'mode', 'requested_by', 'model', 'kinds', 'brief', 'run_notes', 'status', 'error', 'document_seq', 'snapshot', 'input_tokens', 'output_tokens'])]
 #[Hidden(['snapshot'])]
 class ProseReview extends Model
 {
+    // suggestions for the document's own prose
+    public const REVIEW = 'review';
+
+    // documentation drafted from uploaded R scripts, with the document as context
+    public const SCAFFOLD = 'scaffold';
+
     public const QUEUED = 'queued';
 
     public const RUNNING = 'running';
@@ -50,20 +56,36 @@ class ProseReview extends Model
         return $this->hasMany(ProseSuggestion::class, 'review_id');
     }
 
+    /**
+     * The scripts a scaffold drafts from, in upload order.
+     */
+    public function sources(): HasMany
+    {
+        return $this->hasMany(ProseReviewSource::class, 'review_id')->orderBy('id');
+    }
+
     public function wants(string $kind): bool
     {
         return in_array($kind, $this->kinds ?? [], true);
+    }
+
+    public function isScaffold(): bool
+    {
+        return $this->mode === self::SCAFFOLD;
     }
 
     public function toSummary(): array
     {
         return [
             'id' => $this->id,
+            'mode' => $this->mode ?? self::REVIEW,
             'status' => $this->status,
             'scopeBlockId' => $this->scope_block_id,
             'model' => $this->model,
             'kinds' => $this->kinds,
             'brief' => $this->brief,
+            'runNotes' => $this->run_notes,
+            'sources' => $this->isScaffold() ? $this->sources->map->toSummary()->all() : [],
             'error' => $this->error,
             'documentSeq' => $this->document_seq,
             'usage' => ['inputTokens' => $this->input_tokens, 'outputTokens' => $this->output_tokens],

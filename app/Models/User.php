@@ -60,6 +60,9 @@ class User extends Authenticatable
      */
     protected function abilities(): Attribute
     {
-        return Attribute::get(fn () => ['aiReview' => $this->isAdmin() && config('ai-review.enabled')]);
+        return Attribute::get(fn () => [
+            'aiReview' => $this->isAdmin() && config('ai-review.enabled'),
+            'aiScaffold' => $this->isAdmin() && config('ai-review.enabled') && config('ai-review.scaffold.enabled'),
+        ]);
     }
 }

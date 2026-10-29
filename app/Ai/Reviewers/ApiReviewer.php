@@ -9,9 +9,9 @@ use App\Ai\Agents\ProseReviewer;
  */
 class ApiReviewer implements ChunkReviewer
 {
-    public function review(string $prompt, string $model): array
+    public function review(string $prompt, string $model, string $agent = ProseReviewer::class): array
     {
-        $response = ProseReviewer::make()->prompt(
+        $response = $agent::make()->prompt(
             $prompt,
             model: config('ai-review.models')[$model],
             timeout: $this->timeout(),

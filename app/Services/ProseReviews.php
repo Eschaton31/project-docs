@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Ai\PropPath;
+use App\Ai\Scaffold\ScaffoldPlacement;
 use App\Exceptions\LockedException;
 use App\Exceptions\StaleVersionException;
 use App\Exceptions\SuggestionStaleException;
@@ -30,6 +31,7 @@ class ProseReviews
             $revision = match ($suggestion->kind) {
                 ProseSuggestion::TEXT => $this->applyText($suggestion, $user),
                 ProseSuggestion::EXPAND => $this->applyExpand($suggestion, $user),
+                ProseSuggestion::SCAFFOLD => $this->applyScaffold($suggestion, $user),
                 default => $this->applyRestructure($suggestion, $user),
             };
         } catch (StaleVersionException) {
@@ -65,6 +67,36 @@ class ProseReviews
             ->where('kind', ProseSuggestion::TEXT)
             ->where('rule', $rule)
             ->where('status', ProseSuggestion::PENDING)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($suggestions as $suggestion) {
+            try {
+                $result['revisions'][] = $this->accept($suggestion, $user);
+                $result['accepted']++;
+            } catch (SuggestionStaleException) {
+                $result['stale']++;
+            } catch (LockedException) {
+                $result['locked']++;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Accepts every pending suggestion of a scaffold, in the template's order. Ones that went stale, or whose
+     * blocks another tab holds, are skipped and counted.
+     *
+     * @return array{revisions: list<Revision>, accepted: int, stale: int, locked: int}
+     */
+    public function acceptAll(ProseReview $review, User $user): array
+    {
+        $result = ['revisions' => [], 'accepted' => 0, 'stale' => 0, 'locked' => 0];
+
+        $suggestions = $review->suggestions()
+            ->where('status', ProseSuggestion::PENDING)
+            ->orderBy('order')
             ->orderBy('id')
             ->get();
 
@@ -142,6 +174,24 @@ class ProseReviews
         };
 
         return $this->editor->insertTree($document, $user, $parentId, $afterId, $beforeId, $suggestion->replacement);
+    }
+
+    /**
+     * A new section, inserted where the template's order puts it among the document's sections and the ones
+     * already accepted from this scaffold. It only goes stale when the topic it goes into was deleted.
+     */
+    private function applyScaffold(ProseSuggestion $suggestion, User $user): Revision
+    {
+        $document = $suggestion->review->document;
+        if ($suggestion->parent_id && ! $document->blocks()->whereKey($suggestion->parent_id)->exists()) {
+            throw $this->stale($suggestion);
+        }
+
+        [$afterId, $beforeId] = ScaffoldPlacement::for($suggestion, $document);
+        $revision = $this->editor->insertTree($document, $user, $suggestion->parent_id, $afterId, $beforeId, $suggestion->replacement);
+        $suggestion->update(['inserted_id' => $revision->block_id]);
+
+        return $revision;
     }
 
     /**

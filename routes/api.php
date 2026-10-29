@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\LockController;
 use App\Http\Controllers\Api\PrintController;
 use App\Http\Controllers\Api\ProseReviewController;
+use App\Http\Controllers\Api\ProseScaffoldController;
 use App\Http\Controllers\Api\ProseSuggestionController;
 use App\Http\Controllers\Api\SnapshotController;
 use App\Http\Middleware\AiReviewEnabled;
@@ -59,6 +60,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/documents/{document}/reviews', [ProseReviewController::class, 'store'])->middleware('throttle:ai-review');
         Route::get('/reviews/{review}', [ProseReviewController::class, 'show']);
         Route::post('/reviews/{review}/accept-rule', [ProseSuggestionController::class, 'acceptRule']);
+        Route::post('/reviews/{review}/accept-all', [ProseSuggestionController::class, 'acceptAll']);
+        // documentation drafted from uploaded R scripts
+        Route::post('/documents/{document}/scaffolds', [ProseScaffoldController::class, 'store'])->middleware('throttle:ai-review');
+        Route::get('/reviews/{review}/sources/{source}', [ProseScaffoldController::class, 'source']);
         Route::post('/suggestions/{suggestion}/accept', [ProseSuggestionController::class, 'accept']);
         Route::post('/suggestions/{suggestion}/dismiss', [ProseSuggestionController::class, 'dismiss']);
     });

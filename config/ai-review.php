@@ -51,4 +51,23 @@ return [
 
     'style_guide' => resource_path('ai/style-guides/laravel-docs.md'),
 
+    // Drafting documentation from uploaded R scripts (a review with mode "scaffold"). The scripts are only ever
+    // read as text: nothing runs them.
+    'scaffold' => [
+        'enabled' => (bool) env('AI_SCAFFOLD_ENABLED', true),
+        'max_files' => 30,
+        'max_file_kb' => 1024,
+        // all scripts together, after redaction
+        'max_source_chars' => 300_000,
+        // model calls one scaffold may make (the overview, then the scripts in chunks). With the per-call timeout
+        // this sets ReviewProse's timeout, which the ai-review worker's --timeout and the queue connection's
+        // retry_after (config/queue.php) must stay above: 13 × 600s + 60s = 7860s.
+        'max_calls' => 13,
+        // the admin's description of how the scripts are run
+        'max_run_notes' => 8000,
+        // uploaded scripts are deleted this many days after the scaffold finished (prose-review:prune-sources)
+        'retention_days' => 30,
+        'template' => resource_path('ai/templates/r-scripts.md'),
+    ],
+
 ];

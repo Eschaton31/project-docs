@@ -23,12 +23,12 @@ class ClaudeCodeReviewer implements ChunkReviewer
 {
     private ?string $dir = null;
 
-    public function review(string $prompt, string $model): array
+    public function review(string $prompt, string $model, string $agent = ProseReviewer::class): array
     {
         $result = Process::path($this->dir())
             ->timeout($this->timeout())
             ->input($prompt)
-            ->run($this->command($model));
+            ->run($this->command($model, $agent));
 
         $answer = json_decode($result->output(), true);
         if (! $result->successful() || ! is_array($answer) || ($answer['is_error'] ?? true)) {
@@ -82,7 +82,7 @@ class ClaudeCodeReviewer implements ChunkReviewer
     /**
      * @return list<string>
      */
-    public function command(string $model): array
+    public function command(string $model, string $agent = ProseReviewer::class): array
     {
         return [
             config('ai-review.claude_code.binary'),
@@ -90,20 +90,20 @@ class ClaudeCodeReviewer implements ChunkReviewer
             // no Bash, file, web or any other tool; user/project/local settings (and their hooks) ignored
             '--restricted', '--tools', '', '--strict-mcp-config',
             '--no-session-persistence',
-            '--system-prompt-file', $this->instructionsPath(),
+            '--system-prompt-file', $this->instructionsPath($agent),
             '--output-format', 'json',
-            '--json-schema', json_encode(self::schema(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+            '--json-schema', json_encode(self::schema($agent), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             '--model', config('ai-review.claude_code.models')[$model],
         ];
     }
 
     /**
-     * The same answer schema the API reviewer is held to.
+     * The same answer schema the API agent is held to.
      */
-    public static function schema(): array
+    public static function schema(string $agent = ProseReviewer::class): array
     {
         return AnthropicSchemaSanitizer::sanitize(
-            (new ObjectSchema((new ProseReviewer)->schema(new JsonSchemaTypeFactory)))->toSchema()
+            (new ObjectSchema((new $agent)->schema(new JsonSchemaTypeFactory)))->toSchema()
         );
     }
 
@@ -127,11 +127,11 @@ class ClaudeCodeReviewer implements ChunkReviewer
         return $this->dir;
     }
 
-    private function instructionsPath(): string
+    private function instructionsPath(string $agent): string
     {
-        $path = $this->dir().DIRECTORY_SEPARATOR.'instructions.md';
+        $path = $this->dir().DIRECTORY_SEPARATOR.class_basename($agent).'.md';
         if (! File::exists($path)) {
-            File::put($path, (string) (new ProseReviewer)->instructions());
+            File::put($path, (string) (new $agent)->instructions());
         }
 
         return $path;

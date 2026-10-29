@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Ai\ProseExtractor;
 use App\Ai\ReviewRun;
+use App\Ai\Scaffold\ScaffoldRun;
 use App\Models\ProseReview;
 use App\Models\ProseSuggestion;
 use Illuminate\Console\Attributes\Description;
@@ -12,8 +13,8 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
 /**
- * Second half of a review run in Claude Code: reads its answers (one JSON file per chunk), validates them
- * against the text that was exported, and saves the suggestions for admins to accept in the editor.
+ * Second half of a review or scaffold run in Claude Code: reads its answers (one JSON file per chunk or call),
+ * validates them against what was exported, and saves the suggestions for admins to accept in the editor.
  */
 #[Signature('prose-review:import {review : The review id prose-review:export printed}')]
 #[Description('Import the answers of an AI prose review run in Claude Code')]
@@ -26,12 +27,13 @@ class ImportProseReview extends Command
             return $this->fail("Review [{$this->argument('review')}] isn't waiting for answers.");
         }
 
-        $chunks = $review->snapshot['chunks'];
+        $scaffold = $review->isScaffold();
+        $chunks = $scaffold ? $review->snapshot['calls'] : $review->snapshot['chunks'];
         $outputs = [];
         $problems = [];
         foreach (array_keys($chunks) as $i) {
-            $path = ExportProseReview::answerPath($review, $i + 1);
-            [$outputs[$i], $problem] = $this->answer($path);
+            $path = $scaffold ? ExportProseScaffold::answerPath($review, $i + 1) : ExportProseReview::answerPath($review, $i + 1);
+            [$outputs[$i], $problem] = $this->answer($path, $scaffold ? ['sections', 'expand', 'script_topics'] : ProseSuggestion::KINDS);
             if ($problem) {
                 $problems[] = "{$path}: {$problem}";
             }
@@ -45,10 +47,14 @@ class ImportProseReview extends Command
             return self::FAILURE;
         }
 
-        $snapshot = (new ProseExtractor)->extract($review->snapshot['nodes']);
         $dropped = [];
-        foreach ($chunks as $i => $chunk) {
-            $dropped = ReviewRun::addDropped($dropped, ReviewRun::save($review, $snapshot, $chunk, $outputs[$i]));
+        if ($scaffold) {
+            $dropped = ScaffoldRun::save($review, ScaffoldRun::from($review, $review->snapshot['nodes'], $chunks), $outputs);
+        } else {
+            $snapshot = (new ProseExtractor)->extract($review->snapshot['nodes']);
+            foreach ($chunks as $i => $chunk) {
+                $dropped = ReviewRun::addDropped($dropped, ReviewRun::save($review, $snapshot, $chunk, $outputs[$i]));
+            }
         }
         ReviewRun::finish($review, ['input_tokens' => 0, 'output_tokens' => 0], count($chunks), $dropped);
 
@@ -64,7 +70,7 @@ class ImportProseReview extends Command
     /**
      * @return array{0: array, 1: ?string} the parsed answer, or what's wrong with the file
      */
-    private function answer(string $path): array
+    private function answer(string $path, array $keys): array
     {
         if (! File::exists($path)) {
             return [[], 'missing'];
@@ -74,7 +80,7 @@ class ImportProseReview extends Command
         if (! is_array($output) || array_is_list($output)) {
             return [[], 'not a JSON object ('.(json_last_error() ? json_last_error_msg() : 'wrong shape').')'];
         }
-        foreach (ProseSuggestion::KINDS as $key) {
+        foreach ($keys as $key) {
             if (! is_array($output[$key] ?? []) || ! array_is_list($output[$key] ?? [])) {
                 return [[], "\"{$key}\" must be a list"];
             }
