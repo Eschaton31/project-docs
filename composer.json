@@ -56,7 +56,7 @@
       "set NODE_OPTIONS=--max-old-space-size=8192 && npm run build",
       "@php -r \"@unlink('public/hot');\"",
       "@php artisan migrate --force",
-      "npx concurrently -c \"#c4b5fd,#fdba74,#86efac\" \"php artisan queue:work\" \"php artisan reverb:start\" \"php artisan queue:work ai-review --queue=ai-review --tries=1 --timeout=1800\" --names=queue,reverb,ai-queue --kill-others"
+      "npx concurrently -c \"#c4b5fd,#fdba74,#86efac,#fcd34d\" \"php artisan queue:work\" \"php artisan reverb:start\" \"php artisan queue:work ai-review --queue=ai-review --tries=1 --timeout=7900\" \"php artisan schedule:work\" --names=queue,reverb,ai-queue,schedule --kill-others"
     ],
     "test": [
       "@php artisan config:clear --ansi @no_additional_args",
